@@ -2,19 +2,33 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { learning } from '@/lib/api'
-import { ArrowLeft, Volume2 } from 'lucide-react'
+import { ArrowLeft, Pause, Play, Square } from 'lucide-react'
 
 interface Word {
   id: string
-  baseForm: string
+  base_form: string
   definition: string
-  exampleSentence: string
+  example_sentence: string
 }
 
-interface PracticeResult {
-  wordId: string
-  isCorrect: boolean
+interface WordStatus {
+  word_id: string
+  status: 'unseen' | 'green' | 'orange'
+}
+
+interface Session {
+  id: string
+  current_phase: number
+  current_battery_number: number
+  session_state: 'active' | 'paused' | 'completed'
+}
+
+interface Battery {
+  id: string
+  battery_number: number
+  phase: number
+  words_in_battery: string[]
+  battery_state: 'active' | 'completed'
 }
 
 export default function Practice() {
@@ -22,321 +36,218 @@ export default function Practice() {
   const params = useParams()
   const listId = params.listId as string
 
+  const [session, setSession] = useState<Session | null>(null)
+  const [battery, setBattery] = useState<Battery | null>(null)
   const [words, setWords] = useState<Word[]>([])
+  const [statuses, setStatuses] = useState<WordStatus[]>([])
   const [currentWordIndex, setCurrentWordIndex] = useState(0)
-  const [userAnswer, setUserAnswer] = useState('')
-  const [showResult, setShowResult] = useState(false)
-  const [isCorrect, setIsCorrect] = useState(false)
-  const [results, setResults] = useState<PracticeResult[]>([])
+  const [showOverview, setShowOverview] = useState(true)
   const [loading, setLoading] = useState(true)
-  const [sessionComplete, setSessionComplete] = useState(false)
-  const [showDefinition, setShowDefinition] = useState(true)
 
   useEffect(() => {
-    fetchPracticeWords()
+    initializeSession()
   }, [listId])
 
-  const fetchPracticeWords = async () => {
+  const initializeSession = async () => {
     try {
-      const response = await learning.getPracticeWords(listId)
-      if (response.data.words.length === 0) {
-        alert('No words available for practice at this time.')
-        router.push('/dashboard')
-        return
+      // Get or create session
+      const sessionResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/session/${listId}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+
+      if (!sessionResponse.ok) {
+        throw new Error('Failed to get session')
       }
-      setWords(response.data.words)
+
+      const sessionData = await sessionResponse.json()
+      setSession(sessionData.session)
+
+      // Get current battery
+      const batteryResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/battery/${sessionData.session.id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+
+      if (!batteryResponse.ok) {
+        throw new Error('Failed to get battery')
+      }
+
+      const batteryData = await batteryResponse.json()
+      setBattery(batteryData.battery)
+      setWords(batteryData.words)
+      setStatuses(batteryData.statuses)
+
     } catch (error) {
-      console.error('Failed to fetch practice words:', error)
-      alert('Failed to load practice words. Please try again.')
+      console.error('Failed to initialize session:', error)
+      alert('Failed to load practice session. Please try again.')
       router.push('/dashboard')
     } finally {
       setLoading(false)
     }
   }
 
-  const checkAnswer = () => {
-    if (!userAnswer.trim()) return
+  const getWordStatus = (wordId: string): 'unseen' | 'green' | 'orange' => {
+    const status = statuses.find(s => s.word_id === wordId)
+    return status?.status || 'unseen'
+  }
 
-    const currentWord = words[currentWordIndex]
-    const correct = userAnswer.toLowerCase().trim() === currentWord.baseForm.toLowerCase().trim()
-
-    setIsCorrect(correct)
-    setShowResult(true)
-
-    // Add result to collection
-    const result: PracticeResult = {
-      wordId: currentWord.id,
-      isCorrect: correct
-    }
-    setResults(prev => [...prev, result])
-
-    // Play audio feedback (simple beep simulation)
-    if (correct) {
-      playSuccessSound()
-    } else {
-      playErrorSound()
-    }
-
-    // Haptic feedback for mobile
-    if (navigator.vibrate) {
-      navigator.vibrate(correct ? [100] : [100, 50, 100])
+  const getStatusColor = (status: 'unseen' | 'green' | 'orange') => {
+    switch (status) {
+      case 'green': return 'bg-green-500'
+      case 'orange': return 'bg-orange-500'
+      default: return 'bg-gray-700 border border-gray-500'
     }
   }
 
-  const playSuccessSound = () => {
-    if (typeof window !== 'undefined' && window.AudioContext) {
-      const audioContext = new window.AudioContext()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
-
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator.frequency.setValueAtTime(800, audioContext.currentTime)
-      oscillator.frequency.setValueAtTime(1000, audioContext.currentTime + 0.1)
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2)
-
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.2)
-    }
+  const startExercise = () => {
+    setShowOverview(false)
+    setCurrentWordIndex(0)
   }
 
-  const playErrorSound = () => {
-    if (typeof window !== 'undefined' && window.AudioContext) {
-      const audioContext = new window.AudioContext()
-      const oscillator = audioContext.createOscillator()
-      const gainNode = audioContext.createGain()
+  const pauseSession = async () => {
+    if (!session) return
 
-      oscillator.connect(gainNode)
-      gainNode.connect(audioContext.destination)
-
-      oscillator.frequency.setValueAtTime(300, audioContext.currentTime)
-      oscillator.frequency.setValueAtTime(200, audioContext.currentTime + 0.1)
-      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
-
-      oscillator.start(audioContext.currentTime)
-      oscillator.stop(audioContext.currentTime + 0.3)
-    }
-  }
-
-  const nextWord = () => {
-    if (currentWordIndex + 1 >= words.length) {
-      // Session complete, submit results
-      submitResults()
-    } else {
-      setCurrentWordIndex(prev => prev + 1)
-      setUserAnswer('')
-      setShowResult(false)
-      setShowDefinition(true)
-    }
-  }
-
-  const submitResults = async () => {
     try {
-      await learning.submitResults(results)
-      setSessionComplete(true)
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/session/${session.id}/pause`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+
+      router.push('/dashboard')
     } catch (error) {
-      console.error('Failed to submit results:', error)
-      alert('Failed to save your progress. Please try again.')
+      console.error('Failed to pause session:', error)
     }
-  }
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !showResult) {
-      checkAnswer()
-    } else if (e.key === 'Enter' && showResult) {
-      nextWord()
-    }
-  }
-
-  const toggleMode = () => {
-    setShowDefinition(!showDefinition)
-    setUserAnswer('')
-    setShowResult(false)
   }
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-2xl font-mono">LOADING PRACTICE SESSION...</div>
+        <div className="text-2xl font-mono">LOADING SESSION...</div>
       </div>
     )
   }
 
-  if (sessionComplete) {
+  if (!session || !battery) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="w-full max-w-md">
-          <div className="retro-border p-6 bg-black text-center">
-            <h1 className="text-3xl font-bold mb-4">SESSION COMPLETE!</h1>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-2xl font-mono">SESSION ERROR</div>
+      </div>
+    )
+  }
 
-            <div className="mb-6">
-              <div className="text-6xl font-bold mb-2">
-                {Math.round((results.filter(r => r.isCorrect).length / results.length) * 100)}%
-              </div>
-              <div className="text-lg">ACCURACY</div>
-            </div>
+  const phaseName = {
+    1: 'Context Begrijpen',
+    2: 'Woord Plaatsen',
+    3: 'Woord Typen'
+  }[session.current_phase] || 'Unknown'
 
-            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-              <div className="border border-white p-3">
-                <div className="text-2xl font-bold text-green-400">
-                  {results.filter(r => r.isCorrect).length}
-                </div>
-                <div>CORRECT</div>
-              </div>
-              <div className="border border-white p-3">
-                <div className="text-2xl font-bold text-red-400">
-                  {results.filter(r => !r.isCorrect).length}
-                </div>
-                <div>INCORRECT</div>
-              </div>
-            </div>
-
-            <div className="mb-6 p-4 border border-white bg-gray-900">
-              <p className="text-sm font-bold mb-2">💪 GREAT WORK!</p>
-              <p className="text-xs">
-                {results.filter(r => r.isCorrect).length === results.length
-                  ? "Perfect score! You're mastering these words!"
-                  : "Keep practicing to improve your accuracy. Every attempt makes you stronger!"
-                }
-              </p>
-            </div>
-
+  if (showOverview) {
+    return (
+      <div className="min-h-screen p-4">
+        <div className="max-w-4xl mx-auto">
+          <header className="flex justify-between items-center mb-6">
             <button
               onClick={() => router.push('/dashboard')}
-              className="retro-button w-full"
+              className="retro-button flex items-center gap-2"
             >
-              BACK TO DASHBOARD
+              <ArrowLeft size={16} />
+              DASHBOARD
             </button>
+
+            <button
+              onClick={pauseSession}
+              className="retro-button flex items-center gap-2"
+            >
+              <Pause size={16} />
+              PAUZEER
+            </button>
+          </header>
+
+          <div className="retro-border p-8 bg-black">
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-bold mb-2">FASE {session.current_phase}</h1>
+              <h2 className="text-2xl mb-4">{phaseName}</h2>
+              <div className="text-lg">
+                Batterij {session.current_battery_number} • {words.length} woorden
+              </div>
+            </div>
+
+            {/* Fase Progress Indicators */}
+            <div className="flex justify-center mb-8">
+              <div className="flex gap-4">
+                {[1, 2, 3].map(phase => (
+                  <div key={phase} className="text-center">
+                    <div className={`w-12 h-12 border-2 flex items-center justify-center font-bold text-lg ${
+                      phase === session.current_phase
+                        ? 'bg-white text-black border-white'
+                        : phase < session.current_phase
+                          ? 'bg-green-500 border-green-500'
+                          : 'border-gray-500 text-gray-500'
+                    }`}>
+                      {phase}
+                    </div>
+                    <div className="text-xs mt-1">
+                      {phase === 1 ? 'Context' : phase === 2 ? 'Plaatsen' : 'Typen'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Battery Words Grid */}
+            <div className="mb-8">
+              <h3 className="text-xl font-bold mb-4 text-center">WOORDEN IN DEZE BATTERIJ</h3>
+              <div className="grid grid-cols-5 gap-4 max-w-md mx-auto">
+                {words.map((word) => {
+                  const status = getWordStatus(word.id)
+                  return (
+                    <div key={word.id} className="text-center">
+                      <div className={`w-12 h-12 ${getStatusColor(status)} flex items-center justify-center`}>
+                        {status === 'green' && <span className="text-white font-bold">✓</span>}
+                        {status === 'orange' && <span className="text-white font-bold">!</span>}
+                      </div>
+                      <div className="text-xs mt-1 truncate">{word.base_form}</div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Start Button */}
+            <div className="text-center">
+              <button
+                onClick={startExercise}
+                className="retro-button text-xl px-8 py-4 flex items-center gap-3 mx-auto"
+              >
+                <Play size={20} />
+                BEGIN OEFENING
+              </button>
+            </div>
+
+            {/* Phase Description */}
+            <div className="mt-8 p-4 border border-gray-600 bg-gray-900">
+              <h4 className="font-bold mb-2">HOE WERKT FASE {session.current_phase}?</h4>
+              <p className="text-sm">
+                {session.current_phase === 1 && "Je ziet een voorbeeldzin en kiest de juiste betekenis uit 5 opties."}
+                {session.current_phase === 2 && "Je ziet een zin met een leeg lijntje en kiest het juiste woord uit 5 opties."}
+                {session.current_phase === 3 && "Je ziet een zin met een leeg lijntje en typt het juiste woord. De app helpt je met autocorrectie."}
+              </p>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  const currentWord = words[currentWordIndex]
-  const progress = ((currentWordIndex + 1) / words.length) * 100
-
+  // Exercise view will be implemented in the next step
   return (
-    <div className="min-h-screen p-4">
-      <div className="max-w-2xl mx-auto">
-        <header className="flex justify-between items-center mb-6">
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="retro-button flex items-center gap-2"
-          >
-            <ArrowLeft size={16} />
-            BACK
-          </button>
-
-          <div className="text-sm font-mono">
-            {currentWordIndex + 1} / {words.length}
-          </div>
-        </header>
-
-        {/* Progress Bar */}
-        <div className="mb-8">
-          <div className="w-full bg-gray-800 border border-white h-4">
-            <div
-              className="bg-white h-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="retro-border p-8 bg-black">
-          {/* Mode Toggle */}
-          <div className="flex justify-center mb-6">
-            <div className="flex border border-white">
-              <button
-                onClick={() => setShowDefinition(true)}
-                className={`px-4 py-2 font-mono font-bold ${
-                  showDefinition ? 'bg-white text-black' : 'bg-black text-white'
-                }`}
-              >
-                DEFINITION → WORD
-              </button>
-              <button
-                onClick={() => setShowDefinition(false)}
-                className={`px-4 py-2 font-mono font-bold ${
-                  !showDefinition ? 'bg-white text-black' : 'bg-black text-white'
-                }`}
-              >
-                WORD → DEFINITION
-              </button>
-            </div>
-          </div>
-
-          {/* Question */}
-          <div className="text-center mb-8">
-            <div className="text-sm mb-2 opacity-75">
-              {showDefinition ? 'What word matches this definition?' : 'What does this word mean?'}
-            </div>
-
-            <div className="text-2xl font-bold mb-4 p-4 border border-white bg-gray-900">
-              {showDefinition ? currentWord.definition : currentWord.baseForm}
-            </div>
-
-            {currentWord.exampleSentence && (
-              <div className="text-sm italic opacity-75">
-                Example: "{currentWord.exampleSentence}"
-              </div>
-            )}
-          </div>
-
-          {/* Answer Input */}
-          {!showResult ? (
-            <div className="mb-6">
-              <input
-                type="text"
-                value={userAnswer}
-                onChange={(e) => setUserAnswer(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder={showDefinition ? "Type the word..." : "Type the definition..."}
-                className="retro-input w-full p-4 text-lg text-center"
-                autoFocus
-              />
-
-              <button
-                onClick={checkAnswer}
-                disabled={!userAnswer.trim()}
-                className="retro-button w-full mt-4"
-              >
-                CHECK ANSWER
-              </button>
-            </div>
-          ) : (
-            <div className="mb-6">
-              {/* Result Display */}
-              <div className={`p-4 border-2 text-center text-lg font-bold ${
-                isCorrect
-                  ? 'border-green-400 bg-green-900 text-green-100'
-                  : 'border-red-400 bg-red-900 text-red-100'
-              }`}>
-                {isCorrect ? '✓ CORRECT!' : '✗ INCORRECT'}
-              </div>
-
-              {!isCorrect && (
-                <div className="mt-4 p-4 border border-white bg-gray-900 text-center">
-                  <div className="text-sm mb-2">The correct answer was:</div>
-                  <div className="text-xl font-bold">
-                    {showDefinition ? currentWord.baseForm : currentWord.definition}
-                  </div>
-                </div>
-              )}
-
-              <button
-                onClick={nextWord}
-                className="retro-button w-full mt-4"
-              >
-                {currentWordIndex + 1 >= words.length ? 'FINISH SESSION' : 'NEXT WORD'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-2xl font-mono">EXERCISE INTERFACE COMING SOON...</div>
     </div>
   )
 }

@@ -104,6 +104,26 @@ app.post('/api/admin/init-database', async (req, res) => {
   }
 });
 
+// 3-Phase system migration endpoint
+app.post('/api/admin/migrate-3-phase', async (req, res) => {
+  try {
+    const { migrate3PhaseSystem } = require('./migrate-3-phase');
+    await migrate3PhaseSystem();
+    res.json({
+      success: true,
+      message: '3-phase system migration completed successfully',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('3-phase migration error:', error);
+    res.status(500).json({
+      success: false,
+      error: '3-phase migration failed',
+      details: error.message
+    });
+  }
+});
+
 // Authentication routes
 app.post('/api/auth/register', async (req, res) => {
   try {
@@ -448,6 +468,230 @@ app.get('/api/learning/progress', authenticateToken, requireRole('student'), asy
     res.status(500).json({ error: 'Internal server error' });
   }
 });
+
+// 3-Phase Learning System API Endpoints
+
+// Get or create learning session for a word list
+app.get('/api/learning/session/:listId', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { listId } = req.params;
+
+    // Check if session exists
+    let session = await db.query(
+      'SELECT * FROM learning_sessions WHERE user_id = $1 AND list_id = $2',
+      [userId, listId]
+    );
+
+    if (session.rows.length === 0) {
+      // Create new session
+      const newSession = await db.query(
+        `INSERT INTO learning_sessions (user_id, list_id, current_phase, current_battery_number)
+         VALUES ($1, $2, 1, 1) RETURNING *`,
+        [userId, listId]
+      );
+      session = newSession;
+    }
+
+    res.json({
+      session: session.rows[0],
+      message: session.rows.length === 0 ? 'New session created' : 'Existing session retrieved'
+    });
+  } catch (error) {
+    console.error('Get session error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get current battery for a session
+app.get('/api/learning/battery/:sessionId', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user.userId;
+
+    // Verify session belongs to user
+    const session = await db.query(
+      'SELECT * FROM learning_sessions WHERE id = $1 AND user_id = $2',
+      [sessionId, userId]
+    );
+
+    if (session.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const currentSession = session.rows[0];
+
+    // Get or create current battery
+    let battery = await db.query(
+      `SELECT * FROM battery_progress
+       WHERE session_id = $1 AND battery_number = $2 AND phase = $3`,
+      [sessionId, currentSession.current_battery_number, currentSession.current_phase]
+    );
+
+    if (battery.rows.length === 0) {
+      // Create new battery - this will be implemented in the battery composition algorithm
+      const newBattery = await createBatteryForSession(sessionId, currentSession);
+      battery = { rows: [newBattery] };
+    }
+
+    const currentBattery = battery.rows[0];
+
+    // Get word details for this battery
+    const wordIds = currentBattery.words_in_battery;
+    if (wordIds.length === 0) {
+      return res.json({ battery: currentBattery, words: [], statuses: [] });
+    }
+
+    const placeholders = wordIds.map((_, index) => `$${index + 1}`).join(',');
+    const words = await db.query(
+      `SELECT id, base_form, definition, example_sentence FROM words WHERE id IN (${placeholders})`,
+      wordIds
+    );
+
+    // Get word phase statuses
+    const statusPlaceholders = wordIds.map((_, index) => `$${index + 3}`).join(',');
+    const statuses = await db.query(
+      `SELECT word_id, status FROM word_phase_status
+       WHERE user_id = $1 AND phase = $2 AND word_id IN (${statusPlaceholders})`,
+      [userId, currentSession.current_phase, ...wordIds]
+    );
+
+    res.json({
+      battery: currentBattery,
+      words: words.rows,
+      statuses: statuses.rows,
+      session: currentSession
+    });
+  } catch (error) {
+    console.error('Get battery error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Submit answer attempt
+app.post('/api/learning/attempt', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { sessionId, wordId, phase, batteryNumber, isCorrect, responseGiven, responseTime, autocorrectApplied } = req.body;
+
+    // Verify session belongs to user
+    const session = await db.query(
+      'SELECT * FROM learning_sessions WHERE id = $1 AND user_id = $2',
+      [sessionId, userId]
+    );
+
+    if (session.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Get current attempt number for this word
+    const attemptCount = await db.query(
+      `SELECT COUNT(*) FROM word_attempts
+       WHERE session_id = $1 AND word_id = $2 AND phase = $3 AND battery_number = $4`,
+      [sessionId, wordId, phase, batteryNumber]
+    );
+
+    const attemptNumber = parseInt(attemptCount.rows[0].count) + 1;
+
+    // Record the attempt
+    await db.query(
+      `INSERT INTO word_attempts
+       (session_id, word_id, phase, battery_number, attempt_number, is_correct, response_given, response_time, autocorrect_applied)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [sessionId, wordId, phase, batteryNumber, attemptNumber, isCorrect, responseGiven, responseTime, autocorrectApplied || false]
+    );
+
+    // Update or create word phase status
+    const statusResult = await db.query(
+      `INSERT INTO word_phase_status (user_id, word_id, phase, status, first_attempt_correct, total_attempts, last_attempt_at)
+       VALUES ($1, $2, $3, $4, $5, 1, NOW())
+       ON CONFLICT (user_id, word_id, phase)
+       DO UPDATE SET
+         status = $4,
+         total_attempts = word_phase_status.total_attempts + 1,
+         last_attempt_at = NOW(),
+         first_attempt_correct = CASE
+           WHEN word_phase_status.total_attempts = 0 THEN $5
+           ELSE word_phase_status.first_attempt_correct
+         END
+       RETURNING *`,
+      [userId, wordId, phase, isCorrect ? 'green' : 'orange', attemptNumber === 1 ? isCorrect : null]
+    );
+
+    res.json({
+      success: true,
+      attemptNumber,
+      wordStatus: statusResult.rows[0]
+    });
+  } catch (error) {
+    console.error('Submit attempt error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Pause session
+app.post('/api/learning/session/:sessionId/pause', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user.userId;
+
+    await db.query(
+      `UPDATE learning_sessions
+       SET session_state = 'paused', updated_at = NOW()
+       WHERE id = $1 AND user_id = $2`,
+      [sessionId, userId]
+    );
+
+    res.json({ success: true, message: 'Session paused' });
+  } catch (error) {
+    console.error('Pause session error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Resume session
+app.post('/api/learning/session/:sessionId/resume', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const userId = req.user.userId;
+
+    await db.query(
+      `UPDATE learning_sessions
+       SET session_state = 'active', updated_at = NOW()
+       WHERE id = $1 AND user_id = $2`,
+      [sessionId, userId]
+    );
+
+    res.json({ success: true, message: 'Session resumed' });
+  } catch (error) {
+    console.error('Resume session error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper function to create a new battery (will be fully implemented)
+async function createBatteryForSession(sessionId, session) {
+  // This is a placeholder - the full battery composition algorithm will be implemented
+  // For now, get first 5 words from the list
+  const words = await db.query(
+    `SELECT w.id FROM words w
+     JOIN word_lists wl ON w.list_id = wl.id
+     JOIN learning_sessions ls ON wl.id = ls.list_id
+     WHERE ls.id = $1 AND w.is_active = TRUE
+     LIMIT 5`,
+    [sessionId]
+  );
+
+  const wordIds = words.rows.map(row => row.id);
+
+  const battery = await db.query(
+    `INSERT INTO battery_progress (session_id, battery_number, phase, words_in_battery)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [sessionId, session.current_battery_number, session.current_phase, JSON.stringify(wordIds)]
+  );
+
+  return battery.rows[0];
+}
 
 // Catch all route
 app.use('*', (req, res) => {

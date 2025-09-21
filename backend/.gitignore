@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Production builds
+dist/
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+
+# TypeScript (not used in this deployment)
+*.ts
+*.tsx
+tsconfig*.json
+
+# IDE
+.vscode/
+.idea/

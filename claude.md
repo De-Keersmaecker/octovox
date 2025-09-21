@@ -72,36 +72,40 @@ Dashboard:
 - Per lijst: titel, voortgang in 3 fasen, aantal batterijen per fase
 - Knoppen: [Start] of [Hervatten] afhankelijk van status
 
-Batterij Overzicht:
-- Huidige fase indicator (1/2/3)
-- Grid van vierkantjes die de woorden in de batterij vertegenwoordigen
-- Vierkantjes zijn blanco (niet gedaan), groen (juist) of oranje (fout)
-- Voortgangsbalk voor huidige batterij
-- Batterij counter (bv. "Batterij 3/8 in Fase 1")
+Oefenschermen (alle fasen):
+Interface Layout:
+- Bovenaan: 5 progress boxen die real-time de status tonen
+- Boxen kleuren: wit (niet gedaan), groen (juist), oranje (fout na feedback), rood (tijdens 3 sec feedback)
+- Fase indicator (Fase 1/2/3) en batterij counter (bv. "Batterij 3/8")
+- Automatische voortgang: na antwoord 3 seconden feedback, dan automatisch volgende
+- Na 5 vragen: automatisch herhalen van oranje woorden tot alles groen is
 
-Oefenschermen:
 Fase 1 (Multiple Choice):
-- Voorbeeldzin prominent getoond
-- Vraag: "Wat betekent het woord '[woord]' in deze zin?"
+- Voorbeeldzin in een kader getoond (zonder "wordt gebruikt in" tekst)
+- Vraag: "Wat betekent het woord '[woord]'?"
 - 5 knoppen met verschillende definities
-- Onmiddellijke feedback: groen (juist) of oranje (fout)
+- Na klik: 3 seconden feedback (groen of rood), dan auto-advance
+- Geen "Volgende" knop
 
 Fase 2 (Gap-filling):
-- Voorbeeldzin met lijntje: "Ik ga ____ naar school."
+- Voorbeeldzin met lijntje in kader: "Ik ga ____ naar school."
 - Vraag: "Welk woord hoort hier?"
 - 5 knoppen met verschillende woorden
-- Onmiddellijke feedback
+- Na klik: 3 seconden feedback, dan auto-advance
+- Geen "Volgende" knop
 
 Fase 3 (Autocorrect typing):
-- Voorbeeldzin met lijntje
+- Voorbeeldzin met lijntje in kader
 - Invoerveld waar leerling typt
 - Real-time autocorrectie (verkeerde letters worden automatisch vervangen)
-- Na enter: feedback of het origineel juist of fout was
+- Na enter: 3 seconden feedback, dan auto-advance
 
-Tussentijdse Overzichten:
-- Na elke batterij: overzicht van groene en oranje woorden
-- Optie om door te gaan of te pauzeren
-- Overzicht van oranje woorden die nog gedaan moeten worden
+Batterij Flow:
+- Start met 5 nieuwe woorden
+- Na eerste ronde: herhaal alleen oranje woorden
+- Blijf herhalen tot alle 5 boxen groen zijn
+- Dan automatisch naar volgende batterij
+- Geen tussentijdse overzichtspagina's
 
 5. Database Schema (PostgreSQL) - Uitgebreid
 

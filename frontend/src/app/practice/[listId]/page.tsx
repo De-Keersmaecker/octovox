@@ -163,10 +163,16 @@ export default function Practice() {
 
     // Show immediate feedback
     setShowFeedback(true)
-    setWordStatuses(prev => ({
-      ...prev,
-      [currentWord.id]: correct ? 'green' : 'red'
-    }))
+    console.log('Setting word status:', currentWord.id, 'to', correct ? 'green' : 'red')
+    setWordStatuses(prev => {
+      const newStatus = correct ? 'green' : 'red'
+      console.log('Previous statuses:', prev)
+      console.log('New status for', currentWord.id, ':', newStatus)
+      return {
+        ...prev,
+        [currentWord.id]: newStatus
+      }
+    })
 
     playFeedbackSound(correct)
     await submitAttempt(currentWord.id, correct, answer)

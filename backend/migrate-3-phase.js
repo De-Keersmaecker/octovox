@@ -110,9 +110,11 @@ const migrate3PhaseSystem = async () => {
       END;
       $$ language 'plpgsql';
 
+      DROP TRIGGER IF EXISTS update_learning_sessions_updated_at ON learning_sessions;
       CREATE TRIGGER update_learning_sessions_updated_at BEFORE UPDATE ON learning_sessions
           FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+      DROP TRIGGER IF EXISTS update_word_phase_status_updated_at ON word_phase_status;
       CREATE TRIGGER update_word_phase_status_updated_at BEFORE UPDATE ON word_phase_status
           FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
     `;

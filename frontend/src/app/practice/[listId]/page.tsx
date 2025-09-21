@@ -155,7 +155,8 @@ export default function Practice() {
     } else if (phase === 2) {
       correct = answer === currentWord.base_form
     } else if (phase === 3) {
-      correct = !autocorrectApplied && originalTypedAnswer.toLowerCase() === currentWord.base_form.toLowerCase()
+      // For typing phase: correct only if the original typed answer matches exactly (no autocorrect needed)
+      correct = originalTypedAnswer.toLowerCase() === currentWord.base_form.toLowerCase()
     }
 
     setIsCorrect(correct)
@@ -379,13 +380,11 @@ export default function Practice() {
         playAutocorrectSound()
 
         // Set evaluation to red immediately when autocorrect happens
-        if (!autocorrectApplied) {
-          setAutocorrectApplied(true)
-          setWordStatuses(prev => ({
-            ...prev,
-            [currentWord.id]: 'red'
-          }))
-        }
+        setAutocorrectApplied(true)
+        setWordStatuses(prev => ({
+          ...prev,
+          [currentWord.id]: 'red'
+        }))
       } else {
         correctedValue += typedChar
       }

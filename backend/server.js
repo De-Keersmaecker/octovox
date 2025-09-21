@@ -483,6 +483,9 @@ app.get('/api/learning/session/:listId', authenticateToken, requireRole('student
       [userId, listId]
     );
 
+    let isNewSession = false;
+    let sessionData;
+
     if (session.rows.length === 0) {
       // Create new session
       const newSession = await db.query(
@@ -490,12 +493,15 @@ app.get('/api/learning/session/:listId', authenticateToken, requireRole('student
          VALUES ($1, $2, 1, 1) RETURNING *`,
         [userId, listId]
       );
-      session = newSession;
+      sessionData = newSession.rows[0];
+      isNewSession = true;
+    } else {
+      sessionData = session.rows[0];
     }
 
     res.json({
-      session: session.rows[0],
-      message: session.rows.length === 0 ? 'New session created' : 'Existing session retrieved'
+      session: sessionData,
+      message: isNewSession ? 'New session created' : 'Existing session retrieved'
     });
   } catch (error) {
     console.error('Get session error:', error);

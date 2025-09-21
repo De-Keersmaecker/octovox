@@ -67,6 +67,8 @@ export interface JWTPayload {
   role: 'student' | 'teacher';
 }
 
+import { Request } from 'express';
+
 export interface AuthRequest extends Request {
   user?: JWTPayload;
 }

@@ -4,10 +4,10 @@ import { AuthRequest, PracticeWord, PracticeResult } from '../types';
 
 const SPACED_REPETITION_INTERVALS = [1, 3, 7, 14, 30]; // days
 
-export const getPracticeWords = async (req: AuthRequest, res: Response) => {
+export const getPracticeWords = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.userId;
-    const { listId } = req.params;
+    const { listId } = req.params as { listId?: string };
 
     const assignedListsQuery = `
       SELECT DISTINCT wl.id
@@ -65,10 +65,10 @@ export const getPracticeWords = async (req: AuthRequest, res: Response) => {
   }
 };
 
-export const submitPracticeResults = async (req: AuthRequest, res: Response) => {
+export const submitPracticeResults = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.userId;
-    const { results, sessionId } = req.body;
+    const { results, sessionId } = req.body as { results: PracticeResult[]; sessionId?: string };
 
     if (!Array.isArray(results) || results.length === 0) {
       return res.status(400).json({ error: 'Invalid results format' });
@@ -154,7 +154,7 @@ export const submitPracticeResults = async (req: AuthRequest, res: Response) => 
   }
 };
 
-export const getStudentProgress = async (req: AuthRequest, res: Response) => {
+export const getStudentProgress = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user!.userId;
 

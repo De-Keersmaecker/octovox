@@ -14,14 +14,13 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 
 const rateLimiter = new RateLimiterMemory({
-  keyGenerator: (req) => req.ip,
   points: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
   duration: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000') / 1000,
 });
 
 const rateLimiterMiddleware = async (req: express.Request, res: express.Response, next: express.NextFunction) => {
   try {
-    await rateLimiter.consume(req.ip);
+    await rateLimiter.consume(req.ip || 'anonymous');
     next();
   } catch {
     res.status(429).json({ error: 'Too many requests' });

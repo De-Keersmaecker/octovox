@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query } from '../config/database';
 import { User, JWTPayload } from '../types';
 
-export const register = async (req: Request, res: Response) => {
+export const register = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, name, password, classCode } = req.body;
 
@@ -37,7 +37,7 @@ export const register = async (req: Request, res: Response) => {
     );
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role } as JWTPayload,
+      { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET!,
       { expiresIn: process.env.JWT_EXPIRES_IN || '90d' }
     );
@@ -58,7 +58,7 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
-export const login = async (req: Request, res: Response) => {
+export const login = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, password } = req.body;
 
@@ -79,7 +79,7 @@ export const login = async (req: Request, res: Response) => {
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role } as JWTPayload,
+      { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET!,
       { expiresIn: process.env.JWT_EXPIRES_IN || '90d' }
     );
@@ -101,7 +101,7 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
-export const teacherLogin = async (req: Request, res: Response) => {
+export const teacherLogin = async (req: Request, res: Response): Promise<void> => {
   try {
     const { email, teacherCode } = req.body;
 
@@ -121,7 +121,7 @@ export const teacherLogin = async (req: Request, res: Response) => {
     const user = userResult.rows[0];
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role } as JWTPayload,
+      { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET!,
       { expiresIn: process.env.JWT_EXPIRES_IN || '90d' }
     );
@@ -142,7 +142,7 @@ export const teacherLogin = async (req: Request, res: Response) => {
   }
 };
 
-export const verifyEmail = async (req: Request, res: Response) => {
+export const verifyEmail = async (req: Request, res: Response): Promise<void> => {
   try {
     const { token } = req.params;
 

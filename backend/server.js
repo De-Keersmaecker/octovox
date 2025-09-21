@@ -30,7 +30,10 @@ const connectDB = async () => {
 app.use(helmet());
 app.use(compression());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: [
+    'http://localhost:3000',
+    'https://octovox-frontend-production.up.railway.app'
+  ],
   credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));

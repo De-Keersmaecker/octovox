@@ -254,6 +254,8 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
     const userId = req.user.userId;
     const { listId } = req.params;
 
+    console.log('Practice request:', { userId, listId });
+
     // Get assigned lists for this student
     const assignedListsQuery = `
       SELECT DISTINCT wl.id
@@ -264,7 +266,10 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
     `;
 
     const params = listId ? [userId, listId] : [userId];
+    console.log('Assigned lists query params:', params);
+
     const assignedLists = await db.query(assignedListsQuery, params);
+    console.log('Assigned lists result:', assignedLists.rows);
 
     if (assignedLists.rows.length === 0) {
       return res.status(404).json({ error: 'No assigned word lists found' });
@@ -272,7 +277,14 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
 
     // Get practice words with spaced repetition logic
     const listIds = assignedLists.rows.map(row => row.id);
+    console.log('List IDs:', listIds);
+
+    if (listIds.length === 0) {
+      return res.json({ words: [], totalWords: 0 });
+    }
+
     const placeholders = listIds.map((_, index) => `$${index + 2}`).join(',');
+    console.log('Placeholders:', placeholders);
 
     const wordsQuery = `
       SELECT DISTINCT w.id, w.base_form, w.definition, w.example_sentence,
@@ -295,7 +307,11 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
       LIMIT 20
     `;
 
+    console.log('Words query:', wordsQuery);
+    console.log('Words query params:', [userId, ...listIds]);
+
     const wordsResult = await db.query(wordsQuery, [userId, ...listIds]);
+    console.log('Words result:', wordsResult.rows.length, 'words found');
 
     const practiceWords = wordsResult.rows.map(word => ({
       id: word.id,
@@ -310,7 +326,7 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
     });
   } catch (error) {
     console.error('Get practice words error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

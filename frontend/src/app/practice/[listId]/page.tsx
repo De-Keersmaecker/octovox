@@ -55,6 +55,8 @@ export default function Practice() {
   const [wordQueue, setWordQueue] = useState<string[]>([])
   const [isPaused, setIsPaused] = useState(false)
   const [answersDisabled, setAnswersDisabled] = useState(false)
+  const [isFirstRound, setIsFirstRound] = useState(true)
+  const [roundWordIndex, setRoundWordIndex] = useState(0)
 
   useEffect(() => {
     initializeSession()
@@ -103,16 +105,18 @@ export default function Practice() {
       setBattery(batteryData.battery)
       setWords(batteryData.words)
 
-      // Initialize word queue with all words
-      const queue = batteryData.words.map((w: Word) => w.id)
-      setWordQueue(queue)
-
       // Initialize word statuses
       const initialStatuses: {[key: string]: 'white'} = {}
       batteryData.words.forEach((word: Word) => {
         initialStatuses[word.id] = 'white'
       })
       setWordStatuses(initialStatuses)
+
+      // Reset round tracking
+      setIsFirstRound(true)
+      setRoundWordIndex(0)
+      setCurrentWordIndex(0)
+      setWordQueue([])
 
       setLoading(false)
     } catch (error) {
@@ -174,44 +178,65 @@ export default function Practice() {
         [currentWord.id]: correct ? 'green' : 'orange'
       }))
 
-      // Update word queue
-      if (!correct) {
-        // Add word back to queue if incorrect
-        setWordQueue(prev => {
-          const newQueue = [...prev]
-          if (!newQueue.includes(currentWord.id)) {
-            newQueue.push(currentWord.id)
-          }
-          return newQueue
-        })
-      }
-
-      moveToNextWord()
+      moveToNextWord(correct)
     }, 3000)
   }
 
-  const moveToNextWord = () => {
+  const moveToNextWord = (wasCorrect: boolean) => {
     setShowFeedback(false)
     setAnswersDisabled(false)
     resetCurrentWord()
 
-    // Check if all words are green
-    const allGreen = words.every(w => wordStatuses[w.id] === 'green')
+    const currentWord = words[currentWordIndex]
 
-    if (allGreen) {
-      // Move to next battery
-      completeBattery()
+    if (isFirstRound) {
+      // First round: go through all 5 words once
+      if (roundWordIndex < words.length - 1) {
+        // Move to next word in first round
+        setRoundWordIndex(prev => prev + 1)
+        setCurrentWordIndex(prev => prev + 1)
+      } else {
+        // First round complete, build queue of orange words
+        setIsFirstRound(false)
+        const orangeWords: string[] = []
+        words.forEach(w => {
+          if (wordStatuses[w.id] === 'orange') {
+            orangeWords.push(w.id)
+          }
+        })
+
+        if (orangeWords.length === 0) {
+          // All green in first round!
+          completeBattery()
+        } else {
+          // Start repeating orange words
+          setWordQueue(orangeWords)
+          const firstOrangeIndex = words.findIndex(w => w.id === orangeWords[0])
+          setCurrentWordIndex(firstOrangeIndex)
+        }
+      }
     } else {
-      // Find next word to practice
-      const remainingWords = wordQueue.filter(id => wordStatuses[id] !== 'green')
+      // Repetition rounds: only practice orange words
+      if (!wasCorrect) {
+        // Word stays orange, add to end of queue
+        setWordQueue(prev => [...prev.filter(id => id !== currentWord.id), currentWord.id])
+      } else {
+        // Word is now green, remove from queue
+        setWordQueue(prev => prev.filter(id => id !== currentWord.id))
+      }
 
-      if (remainingWords.length > 0) {
-        const nextWordId = remainingWords[0]
+      // Check if all words are green
+      const newQueue = wordQueue.filter(id => id !== currentWord.id || !wasCorrect)
+
+      if (newQueue.length === 0) {
+        // All words are green!
+        completeBattery()
+      } else {
+        // Move to next orange word
+        const nextWordId = newQueue[0]
         const nextIndex = words.findIndex(w => w.id === nextWordId)
         setCurrentWordIndex(nextIndex)
-      } else {
-        // Should not happen, but safety check
-        completeBattery()
+        setWordQueue(newQueue)
       }
     }
   }

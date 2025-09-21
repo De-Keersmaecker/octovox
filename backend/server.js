@@ -86,6 +86,37 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Admin password reset endpoint
+app.post('/api/admin/reset-password', async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return res.status(400).json({ error: 'Email and new password required' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const result = await db.query(
+      'UPDATE users SET password_hash = $1 WHERE email = $2 RETURNING email',
+      [hashedPassword, email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully',
+      email: result.rows[0].email
+    });
+  } catch (error) {
+    console.error('Password reset error:', error);
+    res.status(500).json({ error: 'Password reset failed' });
+  }
+});
+
 // Database initialization endpoint
 app.post('/api/admin/init-database', async (req, res) => {
   try {

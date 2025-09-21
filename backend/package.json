@@ -2,11 +2,11 @@
   "name": "octovox-backend",
   "version": "1.0.0",
   "description": "Backend API for Octovox vocabulary learning app",
-  "main": "dist/server.js",
+  "main": "server.js",
   "scripts": {
     "dev": "nodemon src/server.ts",
-    "build": "echo 'Build completed - using ts-node for runtime'",
-    "start": "npx ts-node src/server.ts",
+    "build": "echo 'Build completed - using Node.js runtime'",
+    "start": "node server.js",
     "test": "jest",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit"

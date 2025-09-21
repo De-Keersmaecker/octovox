@@ -165,18 +165,22 @@ export default function Practice() {
     setShowFeedback(true)
     setWordStatuses(prev => ({
       ...prev,
-      [currentWord.id]: 'red'
+      [currentWord.id]: correct ? 'green' : 'red'
     }))
 
     playFeedbackSound(correct)
     await submitAttempt(currentWord.id, correct, answer)
 
-    // After 3 seconds, update status and move to next
+    // After 3 seconds, move to next word
     timeoutRef.current = setTimeout(() => {
-      setWordStatuses(prev => ({
-        ...prev,
-        [currentWord.id]: correct ? 'green' : 'orange'
-      }))
+      // If incorrect, change red to orange
+      if (!correct) {
+        setWordStatuses(prev => ({
+          ...prev,
+          [currentWord.id]: 'orange'
+        }))
+      }
+      // Green stays green
 
       moveToNextWord(correct)
     }, 3000)

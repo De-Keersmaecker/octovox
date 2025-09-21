@@ -708,6 +708,87 @@ app.post('/api/learning/session/:sessionId/resume', authenticateToken, requireRo
   }
 });
 
+// Complete battery and progress to next
+app.post('/api/learning/battery/complete', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { sessionId, batteryId } = req.body;
+
+    // Verify session belongs to user
+    const session = await db.query(
+      'SELECT * FROM learning_sessions WHERE id = $1 AND user_id = $2',
+      [sessionId, userId]
+    );
+
+    if (session.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const currentSession = session.rows[0];
+
+    // Mark current battery as completed
+    await db.query(
+      'UPDATE battery_progress SET battery_state = $1, completed_at = NOW() WHERE id = $2',
+      ['completed', batteryId]
+    );
+
+    // Check if all words in current phase are green
+    const allWordsInPhase = await db.query(
+      `SELECT COUNT(*) as total_words
+       FROM words w
+       JOIN word_lists wl ON w.list_id = wl.id
+       JOIN class_word_list_assignments cwla ON wl.id = cwla.list_id
+       JOIN class_memberships cm ON cwla.class_id = cm.class_id
+       WHERE cm.user_id = $1 AND wl.id = $2 AND w.is_active = true`,
+      [userId, currentSession.list_id]
+    );
+
+    const greenWordsInPhase = await db.query(
+      `SELECT COUNT(*) as green_words
+       FROM word_phase_status wps
+       JOIN words w ON wps.word_id = w.id
+       WHERE wps.user_id = $1 AND w.list_id = $2 AND wps.phase = $3 AND wps.status = 'green'`,
+      [userId, currentSession.list_id, currentSession.current_phase]
+    );
+
+    const totalWords = parseInt(allWordsInPhase.rows[0].total_words);
+    const greenWords = parseInt(greenWordsInPhase.rows[0].green_words);
+
+    if (greenWords >= totalWords) {
+      // All words in current phase are green, move to next phase
+      if (currentSession.current_phase < 3) {
+        await db.query(
+          `UPDATE learning_sessions
+           SET current_phase = $1, current_battery_number = 1, updated_at = NOW()
+           WHERE id = $2`,
+          [currentSession.current_phase + 1, sessionId]
+        );
+      } else {
+        // All phases complete
+        await db.query(
+          `UPDATE learning_sessions
+           SET session_state = 'completed', completed_at = NOW(), updated_at = NOW()
+           WHERE id = $1`,
+          [sessionId]
+        );
+      }
+    } else {
+      // More batteries needed in current phase
+      await db.query(
+        `UPDATE learning_sessions
+         SET current_battery_number = $1, updated_at = NOW()
+         WHERE id = $2`,
+        [currentSession.current_battery_number + 1, sessionId]
+      );
+    }
+
+    res.json({ success: true, message: 'Battery completed' });
+  } catch (error) {
+    console.error('Complete battery error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Helper function to create a new battery with intelligent word selection
 async function createBatteryForSession(sessionId, session) {
   try {

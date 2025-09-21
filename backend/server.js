@@ -669,28 +669,73 @@ app.post('/api/learning/session/:sessionId/resume', authenticateToken, requireRo
   }
 });
 
-// Helper function to create a new battery (will be fully implemented)
+// Helper function to create a new battery with intelligent word selection
 async function createBatteryForSession(sessionId, session) {
-  // This is a placeholder - the full battery composition algorithm will be implemented
-  // For now, get first 5 words from the list
-  const words = await db.query(
-    `SELECT w.id FROM words w
-     JOIN word_lists wl ON w.list_id = wl.id
-     JOIN learning_sessions ls ON wl.id = ls.list_id
-     WHERE ls.id = $1 AND w.is_active = TRUE
-     LIMIT 5`,
-    [sessionId]
-  );
+  try {
+    const userId = session.user_id;
+    const currentPhase = session.current_phase;
 
-  const wordIds = words.rows.map(row => row.id);
+    // Get all words from the assigned word list
+    const allWordsQuery = `
+      SELECT w.id, w.base_form, w.definition, w.example_sentence,
+             COALESCE(wps.status, 'unseen') as current_status,
+             COALESCE(wps.total_attempts, 0) as total_attempts
+      FROM words w
+      JOIN word_lists wl ON w.list_id = wl.id
+      JOIN learning_sessions ls ON wl.id = ls.list_id
+      LEFT JOIN word_phase_status wps ON w.id = wps.word_id
+        AND wps.user_id = $1 AND wps.phase = $2
+      WHERE ls.id = $3 AND w.is_active = TRUE
+      ORDER BY
+        CASE
+          WHEN wps.status = 'orange' THEN 1  -- Orange words get priority
+          WHEN wps.status IS NULL THEN 2     -- Unseen words next
+          WHEN wps.status = 'green' THEN 3   -- Green words last
+          ELSE 4
+        END,
+        wps.total_attempts DESC,  -- More attempts = higher priority for orange words
+        RANDOM()  -- Random within same priority
+    `;
 
-  const battery = await db.query(
-    `INSERT INTO battery_progress (session_id, battery_number, phase, words_in_battery)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [sessionId, session.current_battery_number, session.current_phase, JSON.stringify(wordIds)]
-  );
+    const allWords = await db.query(allWordsQuery, [userId, currentPhase, sessionId]);
 
-  return battery.rows[0];
+    if (allWords.rows.length === 0) {
+      throw new Error('No words available for this list');
+    }
+
+    // Select up to 5 words for the battery
+    const selectedWords = allWords.rows.slice(0, Math.min(5, allWords.rows.length));
+    const wordIds = selectedWords.map(word => word.id);
+
+    // If we have less than 5 words and this isn't the first battery,
+    // fill up with words from previous batteries for multiple choice options
+    if (wordIds.length < 5 && session.current_battery_number > 1) {
+      const previousBatteryWords = await db.query(
+        `SELECT DISTINCT jsonb_array_elements_text(words_in_battery) as word_id
+         FROM battery_progress
+         WHERE session_id = $1 AND battery_number < $2 AND phase = $3
+         LIMIT $4`,
+        [sessionId, session.current_battery_number, currentPhase, 5 - wordIds.length]
+      );
+
+      const additionalWordIds = previousBatteryWords.rows.map(row => row.word_id);
+      wordIds.push(...additionalWordIds);
+    }
+
+    // Create the battery record
+    const battery = await db.query(
+      `INSERT INTO battery_progress (session_id, battery_number, phase, words_in_battery)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [sessionId, session.current_battery_number, session.current_phase, JSON.stringify(wordIds)]
+    );
+
+    console.log(`Created battery ${session.current_battery_number} for phase ${currentPhase} with ${wordIds.length} words`);
+    return battery.rows[0];
+
+  } catch (error) {
+    console.error('Error creating battery:', error);
+    throw error;
+  }
 }
 
 // Catch all route

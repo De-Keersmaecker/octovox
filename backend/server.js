@@ -287,23 +287,21 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
     console.log('Placeholders:', placeholders);
 
     const wordsQuery = `
-      SELECT DISTINCT w.id, w.base_form, w.definition, w.example_sentence,
+      SELECT w.id, w.base_form, w.definition, w.example_sentence,
              COALESCE(sp.status, 'unseen') as status,
              COALESCE(sp.current_phase, 1) as current_phase,
-             COALESCE(sp.next_review, NOW()) as next_review
+             COALESCE(sp.next_review, NOW()) as next_review,
+             CASE
+               WHEN sp.status = 'learning' AND sp.next_review <= NOW() THEN 1
+               WHEN sp.status IS NULL THEN 2
+               ELSE 3
+             END as priority
       FROM words w
       LEFT JOIN student_progress sp ON w.id = sp.word_id AND sp.user_id = $1
       WHERE w.list_id IN (${placeholders})
         AND w.is_active = TRUE
         AND (sp.status IS NULL OR sp.status != 'mastered' OR sp.next_review <= NOW())
-      ORDER BY
-        CASE
-          WHEN sp.status = 'learning' AND sp.next_review <= NOW() THEN 1
-          WHEN sp.status IS NULL THEN 2
-          ELSE 3
-        END,
-        sp.next_review ASC NULLS FIRST,
-        RANDOM()
+      ORDER BY priority ASC, sp.next_review ASC NULLS FIRST, RANDOM()
       LIMIT 20
     `;
 

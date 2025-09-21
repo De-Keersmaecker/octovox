@@ -20,7 +20,10 @@ const migrate3PhaseSystem = async () => {
       -- Voegt nieuwe tabellen toe voor batterij management en fase tracking
 
       -- Learning sessions tabel - houdt actieve leersessies bij
-      CREATE TABLE IF NOT EXISTS learning_sessions (
+      -- First drop existing table if it exists with old structure
+      DROP TABLE IF EXISTS learning_sessions CASCADE;
+
+      CREATE TABLE learning_sessions (
           id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
           user_id UUID REFERENCES users(id) ON DELETE CASCADE,
           list_id UUID REFERENCES word_lists(id) ON DELETE CASCADE,

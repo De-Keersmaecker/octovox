@@ -271,6 +271,9 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
     }
 
     // Get practice words with spaced repetition logic
+    const listIds = assignedLists.rows.map(row => row.id);
+    const placeholders = listIds.map((_, index) => `$${index + 2}`).join(',');
+
     const wordsQuery = `
       SELECT DISTINCT w.id, w.base_form, w.definition, w.example_sentence,
              COALESCE(sp.status, 'unseen') as status,
@@ -278,7 +281,7 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
              COALESCE(sp.next_review, NOW()) as next_review
       FROM words w
       LEFT JOIN student_progress sp ON w.id = sp.word_id AND sp.user_id = $1
-      WHERE w.list_id = ANY($2)
+      WHERE w.list_id IN (${placeholders})
         AND w.is_active = TRUE
         AND (sp.status IS NULL OR sp.status != 'mastered' OR sp.next_review <= NOW())
       ORDER BY
@@ -292,8 +295,7 @@ app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('stude
       LIMIT 20
     `;
 
-    const listIds = assignedLists.rows.map(row => row.id);
-    const wordsResult = await db.query(wordsQuery, [userId, listIds]);
+    const wordsResult = await db.query(wordsQuery, [userId, ...listIds]);
 
     const practiceWords = wordsResult.rows.map(word => ({
       id: word.id,

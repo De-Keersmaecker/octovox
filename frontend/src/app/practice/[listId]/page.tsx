@@ -334,6 +334,29 @@ export default function Practice() {
     }
   }
 
+  const playAutocorrectSound = () => {
+    if (typeof window !== 'undefined' && window.AudioContext) {
+      const audioContext = new window.AudioContext()
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+
+      // Short negative sound for autocorrect
+      oscillator.frequency.setValueAtTime(200, audioContext.currentTime)
+      gainNode.gain.setValueAtTime(0.2, audioContext.currentTime)
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1)
+
+      oscillator.start(audioContext.currentTime)
+      oscillator.stop(audioContext.currentTime + 0.1)
+    }
+
+    if (navigator.vibrate) {
+      navigator.vibrate([50])
+    }
+  }
+
   const handleTypingInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const currentWord = words[currentWordIndex]
     if (!currentWord || showFeedback) return
@@ -342,7 +365,7 @@ export default function Practice() {
     const targetWord = currentWord.base_form
 
     let correctedValue = ''
-    let needsCorrection = false
+    let hadAutocorrection = false
 
     for (let i = 0; i < input.length; i++) {
       const typedChar = input[i]
@@ -350,8 +373,19 @@ export default function Practice() {
 
       if (targetChar && typedChar !== targetChar) {
         correctedValue += targetChar
-        needsCorrection = true
-        setAutocorrectApplied(true)
+        hadAutocorrection = true
+
+        // Play negative sound for each autocorrected letter
+        playAutocorrectSound()
+
+        // Set evaluation to red immediately when autocorrect happens
+        if (!autocorrectApplied) {
+          setAutocorrectApplied(true)
+          setWordStatuses(prev => ({
+            ...prev,
+            [currentWord.id]: 'red'
+          }))
+        }
       } else {
         correctedValue += typedChar
       }
@@ -359,6 +393,14 @@ export default function Practice() {
 
     setOriginalTypedAnswer(input)
     setTypedAnswer(correctedValue)
+
+    // Check if word is complete
+    if (correctedValue.length === targetWord.length && correctedValue.toLowerCase() === targetWord.toLowerCase()) {
+      // Word is complete - automatically submit
+      setTimeout(() => {
+        handleAnswer(correctedValue, 3)
+      }, 100) // Small delay to ensure state is updated
+    }
   }
 
   const handleTypingSubmit = (e: React.FormEvent) => {
@@ -550,7 +592,7 @@ export default function Practice() {
 
           {/* Typing input for Phase 3 */}
           {session.current_phase === 3 && (
-            <form onSubmit={handleTypingSubmit} className="space-y-4">
+            <div className="space-y-4">
               <input
                 ref={inputRef}
                 type="text"
@@ -564,21 +606,15 @@ export default function Practice() {
                       : 'bg-red-500 text-white'
                     : ''
                   }
-                  ${autocorrectApplied && !showFeedback ? 'text-orange-400' : ''}
+                  ${autocorrectApplied && !showFeedback ? 'text-red-400' : ''}
                 `}
                 placeholder="Type hier..."
                 autoFocus
               />
-              {!showFeedback && (
-                <button
-                  type="submit"
-                  disabled={!typedAnswer}
-                  className="retro-button w-full"
-                >
-                  CONTROLEER
-                </button>
-              )}
-            </form>
+              <p className="text-center text-sm font-mono text-gray-400">
+                Het woord wordt automatisch gecontroleerd wanneer compleet
+              </p>
+            </div>
           )}
 
           {/* Feedback message */}

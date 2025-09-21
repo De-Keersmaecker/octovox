@@ -488,12 +488,12 @@ export default function Practice() {
             {words.map((word) => (
               <div
                 key={word.id}
-                className={`w-12 h-12 border-2 border-white flex items-center justify-center font-mono
-                  ${wordStatuses[word.id] === 'green' ? 'bg-green-500' : ''}
-                  ${wordStatuses[word.id] === 'orange' ? 'bg-orange-500' : ''}
-                  ${wordStatuses[word.id] === 'red' ? 'bg-red-500' : ''}
-                  ${wordStatuses[word.id] === 'white' ? 'bg-black' : ''}
-                `}
+                className={`w-12 h-12 border-2 border-white flex items-center justify-center font-mono ${
+                  wordStatuses[word.id] === 'green' ? 'bg-green-500' :
+                  wordStatuses[word.id] === 'red' ? 'bg-red-500' :
+                  wordStatuses[word.id] === 'orange' ? 'bg-orange-500' :
+                  'bg-black'
+                }`}
               >
                 {word === currentWord && !showFeedback ? '▶' : ''}
               </div>

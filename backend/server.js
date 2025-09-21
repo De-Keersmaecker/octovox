@@ -505,7 +505,7 @@ app.get('/api/learning/session/:listId', authenticateToken, requireRole('student
     });
   } catch (error) {
     console.error('Get session error:', error);
-    res.status(500).json({ error: 'Internal server error', details: error.message });
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

@@ -936,7 +936,7 @@ app.get('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin, 
     const { listId } = req.params;
 
     const words = await db.query(
-      `SELECT id, base_form, definition, example_sentence, is_active
+      `SELECT id, base_form as word, definition, example_sentence as example, is_active
        FROM words
        WHERE list_id = $1
        ORDER BY base_form`,
@@ -1301,22 +1301,6 @@ app.post('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin,
   }
 });
 
-// Admin: Get words for a list
-app.get('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin, async (req, res) => {
-  try {
-    const { listId } = req.params;
-
-    const result = await db.query(
-      'SELECT id, base_form as word, definition, example_sentence as example, is_active FROM words WHERE list_id = $1 ORDER BY created_at DESC',
-      [listId]
-    );
-
-    res.json({ words: result.rows });
-  } catch (error) {
-    console.error('Get words error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 // Admin: Update word
 app.put('/api/admin/words/:wordId', authenticateToken, requireAdmin, async (req, res) => {

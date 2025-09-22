@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { JetBrains_Mono } from 'next/font/google'
 import './globals.css'
+import DevRoleSwitcher from '@/components/DevRoleSwitcher'
 
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'] })
 
@@ -19,6 +20,7 @@ export default function RootLayout({
       <body className={jetbrainsMono.className}>
         <div className="min-h-screen bg-black text-white">
           {children}
+          <DevRoleSwitcher />
         </div>
       </body>
     </html>

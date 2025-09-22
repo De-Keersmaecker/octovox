@@ -40,6 +40,14 @@ a {
   }
 }
 
+.retro-button-small {
+  @apply px-2 py-1 text-xs font-mono font-bold uppercase border-2 border-white bg-black text-white hover:bg-white hover:text-black transition-colors duration-200;
+}
+
+.retro-button-secondary {
+  @apply px-4 py-2 font-mono font-bold uppercase border-2 border-white bg-black text-white hover:bg-gray-800 transition-colors duration-200;
+}
+
 .animate-correct {
   animation: pulse-green 0.5s ease-in-out;
 }

@@ -59,9 +59,21 @@ Toegang: Logt in met een e-mailadres en een speciale lerarencode.
 Functionaliteiten:
 - Monitort de voortgang van leerlingen per klas en per woordenlijst
 - Analyseert welke woorden het moeilijkst zijn per lijst
-- Beheert woordenlijsten: creëren, bewerken, verwijderen, en woorden activeren/deactiveren
 - Wijst lijsten toe: koppelt specifieke woordenlijsten aan specifieke klassen
 - Bekijkt detailstatistieken per fase en per batterij
+
+Rol: Administrator
+Toegang: Verborgen administrator login (niet zichtbaar voor studenten/teachers) met speciale credentials.
+
+Functionaliteiten:
+- Beheert woordenlijsten: creëren, bewerken, verwijderen (met bevestiging), en woorden activeren/deactiveren
+- Upload Excel bestanden naar bestaande lijsten of creëert nieuwe lijsten
+- Excel formaat: Kolom A = woord (basisvorm), Kolom B = betekenis, Kolom C = voorbeeldzin met woord tussen *sterretjes*
+- Dashboard overzicht van alle woordenlijsten en woorden met statistieken
+- Kan individuele woorden en voorbeeldzinnen inline bewerken
+- Behoudt bestaande woordenlijsten en data
+- Volledige CRUD operaties op woordenschat database
+- Teachers blijven verantwoordelijk voor toewijzing lijsten aan klassen
 
 4. Gebruikerservaring (UX) & Visueel Ontwerp (UI)
 
@@ -107,15 +119,46 @@ Batterij Flow:
 - Dan automatisch naar volgende batterij
 - Geen tussentijdse overzichtspagina's
 
+Administrator Flow
+Dashboard:
+- Welkomstboodschap met administrator naam
+- Overzicht van alle woordenlijsten met statistieken
+- Upload functionaliteit voor Excel bestanden
+- Filter- en zoekmogelijkheden voor woordenlijsten
+
+Excel Upload Interface:
+- Drag & drop zone voor Excel bestanden (.xlsx)
+- Preview van geüploade data vóór verwerking
+- Validatie: controleer formaat (3 kolommen), detect woorden tussen *sterretjes*
+- Optie voor thema/titel invoer
+- Progressie indicator tijdens verwerking
+
+Woordenlijst Beheer:
+- Tabel met alle woordenlijsten: titel, aantal woorden, status, laatst aangepast
+- CRUD operaties: bekijken, bewerken, verwijderen van lijsten
+- Bulk acties: activeren/deactiveren van woorden
+- Export functionaliteit naar Excel
+
+Woord Beheer Interface:
+- Detailweergave per woordenlijst
+- Inline editing van woorden, definities en voorbeeldzinnen
+- Validatie van voorbeeldzinnen (woord moet tussen *sterretjes* staan)
+- Batch editing mogelijkheden
+- Voorbeeld preview van hoe oefeningen eruit zien
+
 5. Database Schema (PostgreSQL) - Uitgebreid
 
 Bestaande tabellen:
-- users: id, email, name, password_hash, role
+- users: id, email, name, password_hash, role (student/teacher/administrator)
 - classes: id, name, class_code, teacher_id
 - class_memberships: user_id, class_id
-- word_lists: id, title, creator_id
+- word_lists: id, title, creator_id, theme, created_at, updated_at
 - class_word_list_assignments: class_id, list_id
 - words: id, list_id, base_form, definition, example_sentence, is_active
+
+Nieuwe tabellen voor administrator functionaliteit:
+- upload_sessions: id, admin_id, filename, status, total_words, processed_words, errors, created_at
+- word_templates: id, theme, sample_words (voor Excel template download)
 
 Nieuwe tabellen voor 3-fasen systeem:
 

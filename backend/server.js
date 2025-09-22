@@ -826,6 +826,158 @@ app.post('/api/learning/battery/complete', authenticateToken, requireRole('stude
   }
 });
 
+// Administrator login
+app.post('/api/auth/admin-login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    const userResult = await db.query(
+      'SELECT id, email, name, password_hash, role FROM users WHERE email = $1 AND role = $2',
+      [email, 'administrator']
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const user = userResult.rows[0];
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '90d' }
+    );
+
+    res.json({
+      message: 'Admin login successful',
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Admin login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Helper function to require administrator role
+const requireAdmin = (req, res, next) => {
+  if (req.user.role !== 'administrator') {
+    return res.status(403).json({ error: 'Administrator access required' });
+  }
+  next();
+};
+
+// Admin: Get all word lists with statistics
+app.get('/api/admin/word-lists', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const query = `
+      SELECT
+        wl.id,
+        wl.title,
+        wl.theme,
+        wl.created_at,
+        wl.updated_at,
+        COUNT(w.id) as total_words,
+        COUNT(CASE WHEN w.is_active = true THEN 1 END) as active_words,
+        u.name as creator_name
+      FROM word_lists wl
+      LEFT JOIN words w ON wl.id = w.list_id
+      LEFT JOIN users u ON wl.creator_id = u.id
+      GROUP BY wl.id, wl.title, wl.theme, wl.created_at, wl.updated_at, u.name
+      ORDER BY wl.updated_at DESC
+    `;
+
+    const result = await db.query(query);
+    res.json({ wordLists: result.rows });
+  } catch (error) {
+    console.error('Get word lists error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: Get words for a specific list
+app.get('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { listId } = req.params;
+
+    const words = await db.query(
+      `SELECT id, base_form, definition, example_sentence, is_active
+       FROM words
+       WHERE list_id = $1
+       ORDER BY base_form`,
+      [listId]
+    );
+
+    const listInfo = await db.query(
+      'SELECT title, theme FROM word_lists WHERE id = $1',
+      [listId]
+    );
+
+    res.json({
+      list: listInfo.rows[0],
+      words: words.rows
+    });
+  } catch (error) {
+    console.error('Get words error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: Create new word list
+app.post('/api/admin/word-lists', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { title, theme } = req.body;
+    const creatorId = req.user.userId;
+
+    const result = await db.query(
+      'INSERT INTO word_lists (title, theme, creator_id) VALUES ($1, $2, $3) RETURNING *',
+      [title, theme || null, creatorId]
+    );
+
+    res.json({ wordList: result.rows[0] });
+  } catch (error) {
+    console.error('Create word list error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: Delete word list
+app.delete('/api/admin/word-lists/:listId', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { listId } = req.params;
+
+    // Check if list exists and get info
+    const listCheck = await db.query(
+      'SELECT title FROM word_lists WHERE id = $1',
+      [listId]
+    );
+
+    if (listCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Word list not found' });
+    }
+
+    // Delete associated data in correct order
+    await db.query('DELETE FROM class_word_list_assignments WHERE list_id = $1', [listId]);
+    await db.query('DELETE FROM words WHERE list_id = $1', [listId]);
+    await db.query('DELETE FROM word_lists WHERE id = $1', [listId]);
+
+    res.json({ message: 'Word list deleted successfully' });
+  } catch (error) {
+    console.error('Delete word list error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Helper function to create a new battery with intelligent word selection
 async function createBatteryForSession(sessionId, session) {
   try {

@@ -3,6 +3,8 @@ import { JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import DevRoleSwitcher from '@/components/DevRoleSwitcher'
 
+export const dynamic = 'force-dynamic'
+
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'] })
 
 export const metadata: Metadata = {

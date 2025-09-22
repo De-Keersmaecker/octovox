@@ -56,15 +56,17 @@ export default function DevRoleSwitcher() {
   }
 
   // Show for specific developer email or in development mode
-  const userData = localStorage.getItem('user')
-  if (userData) {
-    const user = JSON.parse(userData)
-    // Always show for your email
-    if (user.email !== 'jelledekeersmaecker@gmail.com' && process.env.NODE_ENV === 'production') {
+  if (typeof window !== 'undefined') {
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      const user = JSON.parse(userData)
+      // Always show for your email
+      if (user.email !== 'jelledekeersmaecker@gmail.com' && process.env.NODE_ENV === 'production') {
+        return null
+      }
+    } else if (process.env.NODE_ENV === 'production') {
       return null
     }
-  } else if (process.env.NODE_ENV === 'production') {
-    return null
   }
 
   return (

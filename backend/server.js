@@ -1284,7 +1284,7 @@ app.post('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin,
 
     // Insert word
     const result = await db.query(
-      'INSERT INTO words (list_id, base_form, definition, example_sentence, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      'INSERT INTO words (list_id, base_form, definition, example_sentence, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING id, base_form as word, definition, example_sentence as example, is_active',
       [listId, word, definition, example, true]
     );
 
@@ -1307,7 +1307,7 @@ app.get('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin, 
     const { listId } = req.params;
 
     const result = await db.query(
-      'SELECT * FROM words WHERE list_id = $1 ORDER BY created_at DESC',
+      'SELECT id, base_form as word, definition, example_sentence as example, is_active FROM words WHERE list_id = $1 ORDER BY created_at DESC',
       [listId]
     );
 
@@ -1322,11 +1322,11 @@ app.get('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin, 
 app.put('/api/admin/words/:wordId', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { wordId } = req.params;
-    const { base_form, definition, example_sentence, is_active } = req.body;
+    const { word, definition, example, is_active } = req.body;
 
     // Validate example sentence contains word between asterisks
-    if (example_sentence) {
-      const wordInSentence = example_sentence.match(/\*([^*]+)\*/);
+    if (example) {
+      const wordInSentence = example.match(/\*([^*]+)\*/);
       if (!wordInSentence) {
         return res.status(400).json({ error: 'Example sentence must contain word between *asterisks*' });
       }
@@ -1335,8 +1335,8 @@ app.put('/api/admin/words/:wordId', authenticateToken, requireAdmin, async (req,
     const result = await db.query(
       `UPDATE words
        SET base_form = $1, definition = $2, example_sentence = $3, is_active = $4
-       WHERE id = $5 RETURNING *`,
-      [base_form, definition, example_sentence, is_active, wordId]
+       WHERE id = $5 RETURNING id, base_form as word, definition, example_sentence as example, is_active`,
+      [word, definition, example, is_active, wordId]
     );
 
     if (result.rows.length === 0) {

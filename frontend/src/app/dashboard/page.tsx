@@ -71,11 +71,18 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen p-4">
       <div className="max-w-4xl mx-auto">
-        <header className="mb-8">
+        <header className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-4xl font-bold mb-2">OCTOVOX</h1>
             <p className="text-lg">Welkom terug, {user?.name}</p>
           </div>
+          <button
+            onClick={handleLogout}
+            className="retro-button flex items-center gap-2"
+          >
+            <LogOut size={16} />
+            UITLOGGEN
+          </button>
         </header>
 
         <div className="grid gap-6">

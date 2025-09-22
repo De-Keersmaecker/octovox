@@ -6,6 +6,9 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Client } = require('pg');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+const XLSX = require('xlsx');
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
@@ -40,6 +43,22 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Configure multer for file uploads
+const upload = multer({
+  dest: 'uploads/',
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.mimetype === 'application/vnd.ms-excel') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files (.xlsx, .xls) are allowed'));
+    }
+  }
+});
 
 // Authentication middleware
 const authenticateToken = (req, res, next) => {
@@ -1019,6 +1038,208 @@ app.delete('/api/admin/word-lists/:listId', authenticateToken, requireAdmin, asy
     res.json({ message: 'Word list deleted successfully' });
   } catch (error) {
     console.error('Delete word list error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: Upload Excel file and parse words
+app.post('/api/admin/upload-excel', authenticateToken, requireAdmin, upload.single('excelFile'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    const { listId, title, theme } = req.body;
+    const adminId = req.user.userId;
+
+    // Read the Excel file
+    const workbook = XLSX.readFile(req.file.path);
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+    // Validate data structure
+    if (data.length < 2) {
+      fs.unlinkSync(req.file.path); // Clean up uploaded file
+      return res.status(400).json({ error: 'Excel file must contain at least a header row and one data row' });
+    }
+
+    // Process each row (skip header row)
+    const validWords = [];
+    const errors = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+
+      if (!row || row.length < 3) {
+        errors.push(`Row ${i + 1}: Missing required columns`);
+        continue;
+      }
+
+      const [word, definition, exampleSentence] = row;
+
+      if (!word || !definition || !exampleSentence) {
+        errors.push(`Row ${i + 1}: Empty required fields`);
+        continue;
+      }
+
+      // Check if example sentence contains the word between asterisks
+      const wordInSentence = exampleSentence.match(/\*([^*]+)\*/);
+      if (!wordInSentence) {
+        errors.push(`Row ${i + 1}: Example sentence must contain word between *asterisks*`);
+        continue;
+      }
+
+      validWords.push({
+        base_form: word.toString().trim(),
+        definition: definition.toString().trim(),
+        example_sentence: exampleSentence.toString().trim()
+      });
+    }
+
+    if (validWords.length === 0) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        error: 'No valid words found in Excel file',
+        errors
+      });
+    }
+
+    // Create upload session
+    const uploadSession = await db.query(
+      'INSERT INTO upload_sessions (admin_id, filename, total_words, processed_words, errors) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [adminId, req.file.originalname, validWords.length, 0, JSON.stringify(errors)]
+    );
+
+    let targetListId = listId;
+
+    // Create new list if not adding to existing
+    if (!listId && title) {
+      const newList = await db.query(
+        'INSERT INTO word_lists (title, theme, creator_id) VALUES ($1, $2, $3) RETURNING *',
+        [title, theme || null, adminId]
+      );
+      targetListId = newList.rows[0].id;
+    }
+
+    if (!targetListId) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({ error: 'Either listId or title must be provided' });
+    }
+
+    // Insert words into database
+    let processedCount = 0;
+    for (const word of validWords) {
+      try {
+        await db.query(
+          'INSERT INTO words (list_id, base_form, definition, example_sentence, is_active) VALUES ($1, $2, $3, $4, $5)',
+          [targetListId, word.base_form, word.definition, word.example_sentence, true]
+        );
+        processedCount++;
+      } catch (error) {
+        console.error('Error inserting word:', error);
+        errors.push(`Failed to insert word: ${word.base_form}`);
+      }
+    }
+
+    // Update upload session
+    await db.query(
+      'UPDATE upload_sessions SET status = $1, processed_words = $2, errors = $3 WHERE id = $4',
+      ['completed', processedCount, JSON.stringify(errors), uploadSession.rows[0].id]
+    );
+
+    // Update list timestamp
+    await db.query(
+      'UPDATE word_lists SET updated_at = NOW() WHERE id = $1',
+      [targetListId]
+    );
+
+    // Clean up uploaded file
+    fs.unlinkSync(req.file.path);
+
+    res.json({
+      success: true,
+      message: `Successfully processed ${processedCount} words`,
+      uploadSessionId: uploadSession.rows[0].id,
+      listId: targetListId,
+      processedWords: processedCount,
+      totalWords: validWords.length,
+      errors: errors.length > 0 ? errors : null
+    });
+
+  } catch (error) {
+    console.error('Excel upload error:', error);
+
+    // Clean up file on error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// Admin: Update word
+app.put('/api/admin/words/:wordId', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { wordId } = req.params;
+    const { base_form, definition, example_sentence, is_active } = req.body;
+
+    // Validate example sentence contains word between asterisks
+    if (example_sentence) {
+      const wordInSentence = example_sentence.match(/\*([^*]+)\*/);
+      if (!wordInSentence) {
+        return res.status(400).json({ error: 'Example sentence must contain word between *asterisks*' });
+      }
+    }
+
+    const result = await db.query(
+      `UPDATE words
+       SET base_form = $1, definition = $2, example_sentence = $3, is_active = $4
+       WHERE id = $5 RETURNING *`,
+      [base_form, definition, example_sentence, is_active, wordId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Word not found' });
+    }
+
+    // Update list timestamp
+    await db.query(
+      'UPDATE word_lists SET updated_at = NOW() WHERE id = (SELECT list_id FROM words WHERE id = $1)',
+      [wordId]
+    );
+
+    res.json({ word: result.rows[0] });
+  } catch (error) {
+    console.error('Update word error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: Delete word
+app.delete('/api/admin/words/:wordId', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { wordId } = req.params;
+
+    const result = await db.query(
+      'DELETE FROM words WHERE id = $1 RETURNING list_id',
+      [wordId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Word not found' });
+    }
+
+    // Update list timestamp
+    await db.query(
+      'UPDATE word_lists SET updated_at = NOW() WHERE id = $1',
+      [result.rows[0].list_id]
+    );
+
+    res.json({ message: 'Word deleted successfully' });
+  } catch (error) {
+    console.error('Delete word error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

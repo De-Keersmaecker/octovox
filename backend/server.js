@@ -192,6 +192,93 @@ app.post('/api/admin/migrate-3-phase', async (req, res) => {
   }
 });
 
+// Dev setup test data endpoint
+app.post('/api/dev/setup-test-data', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Only allow specific email
+    if (email !== 'jelledekeersmaecker@gmail.com') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    console.log('Setting up test data...');
+
+    // 1. Create test classes
+    await db.query(`
+      INSERT INTO classes (code, name, teacher_id, created_at)
+      VALUES
+        ('CLASS2024', 'Klas 6A - 2024', NULL, NOW()),
+        ('CLASS2025', 'Klas 6B - 2024', NULL, NOW())
+      ON CONFLICT (code) DO NOTHING
+    `);
+
+    // 2. Create test students (password is 'student123' hashed)
+    const hashedPassword = '$2a$10$X4kv7j5ZcQbLF5LlYx0Oc.GJdgyLWg6h7AUaAXhh7NVmRsDZ3F9bW';
+
+    await db.query(`
+      INSERT INTO users (email, name, password, role, class_code)
+      VALUES
+        ('anna@test.com', 'Anna Janssens', $1, 'student', 'CLASS2024'),
+        ('pieter@test.com', 'Pieter De Vries', $1, 'student', 'CLASS2024'),
+        ('emma@test.com', 'Emma Peeters', $1, 'student', 'CLASS2025'),
+        ('lucas@test.com', 'Lucas Van Damme', $1, 'student', 'CLASS2025'),
+        ('sophie@test.com', 'Sophie Willems', $1, 'student', 'CLASS2024')
+      ON CONFLICT (email) DO UPDATE SET class_code = EXCLUDED.class_code
+    `, [hashedPassword]);
+
+    // 3. Create test teacher
+    await db.query(`
+      INSERT INTO users (email, name, password, role)
+      VALUES ('teacher@test.com', 'Mevr. De Boeck', $1, 'teacher')
+      ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role
+    `, [hashedPassword]);
+
+    // 4. Create class_word_lists table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS class_word_lists (
+        id SERIAL PRIMARY KEY,
+        class_code VARCHAR(50) NOT NULL,
+        list_id INTEGER NOT NULL REFERENCES word_lists(id) ON DELETE CASCADE,
+        assigned_by INTEGER REFERENCES users(id),
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+        UNIQUE(class_code, list_id)
+      )
+    `);
+
+    // 5. Assign all existing word lists to test classes
+    await db.query(`
+      INSERT INTO class_word_lists (class_code, list_id, is_active)
+      SELECT c.code, wl.id, true
+      FROM classes c
+      CROSS JOIN word_lists wl
+      ON CONFLICT (class_code, list_id) DO UPDATE SET is_active = true
+    `);
+
+    // 6. Get counts for verification
+    const userCount = await db.query("SELECT COUNT(*) FROM users WHERE email LIKE '%@test.com'");
+    const classCount = await db.query("SELECT COUNT(*) FROM classes WHERE code LIKE 'CLASS%'");
+    const assignmentCount = await db.query("SELECT COUNT(*) FROM class_word_lists");
+
+    console.log('✅ Test data setup completed!');
+
+    res.json({
+      success: true,
+      message: 'Test data setup completed!',
+      stats: {
+        testUsers: parseInt(userCount.rows[0].count),
+        testClasses: parseInt(classCount.rows[0].count),
+        listAssignments: parseInt(assignmentCount.rows[0].count)
+      }
+    });
+
+  } catch (error) {
+    console.error('Setup test data error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
 // Dev login route (only for jelledekeersmaecker@gmail.com)
 app.post('/api/auth/dev-login', async (req, res) => {
   try {

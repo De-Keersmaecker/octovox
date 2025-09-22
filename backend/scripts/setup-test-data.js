@@ -2,11 +2,14 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
+// Use Railway production database URL
+const DATABASE_URL = 'postgresql://postgres:vFKbJReBWJAOVeOTdKJjSMgLLJwGlkGb@junction.proxy.rlwy.net:43071/railway';
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes('railway') ? {
+  connectionString: DATABASE_URL,
+  ssl: {
     rejectUnauthorized: false
-  } : false
+  }
 });
 
 async function setupTestData() {

@@ -973,6 +973,39 @@ app.post('/api/admin/word-lists', authenticateToken, requireAdmin, async (req, r
 // Admin: Run migration
 app.post('/api/admin/migrate', async (req, res) => {
   try {
+    const { action, email, password, name } = req.body;
+
+    if (action === 'create_admin') {
+      // Create admin account directly
+      if (!email || !password || !name) {
+        return res.status(400).json({ error: 'Email, password and name are required' });
+      }
+
+      // Check if admin already exists
+      const existingUser = await db.query(
+        'SELECT id FROM users WHERE email = $1',
+        [email]
+      );
+
+      if (existingUser.rows.length > 0) {
+        return res.status(400).json({ error: 'User already exists' });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const result = await db.query(
+        'INSERT INTO users (email, name, password_hash, role, is_verified) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role',
+        [email, name, hashedPassword, 'administrator', true]
+      );
+
+      return res.json({
+        success: true,
+        message: 'Admin account created successfully',
+        user: result.rows[0]
+      });
+    }
+
+    // Original migration
     const { migrateAdminFeatures } = require('./migrate-admin');
     await migrateAdminFeatures();
     res.json({ success: true, message: 'Admin migration completed successfully' });

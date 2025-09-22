@@ -294,12 +294,12 @@ app.post('/api/auth/teacher-login', async (req, res) => {
     }
 
     const userResult = await db.query(
-      'SELECT id, email, name, role FROM users WHERE email = $1 AND role = $2',
-      [email, 'teacher']
+      'SELECT id, email, name, role FROM users WHERE email = $1 AND role IN ($2, $3)',
+      [email, 'teacher', 'administrator']
     );
 
     if (userResult.rows.length === 0) {
-      return res.status(401).json({ error: 'Teacher not found' });
+      return res.status(401).json({ error: 'Teacher or administrator not found' });
     }
 
     const user = userResult.rows[0];

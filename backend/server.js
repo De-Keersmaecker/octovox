@@ -75,6 +75,16 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ error: 'Access token required' });
   }
 
+  // Development mode bypass for specific dev token
+  if (token.startsWith('dev-token-') && process.env.NODE_ENV !== 'production') {
+    req.user = {
+      userId: 'dev-user',
+      email: 'jelledekeersmaecker@gmail.com',
+      role: 'administrator'
+    };
+    return next();
+  }
+
   try {
     const user = jwt.verify(token, process.env.JWT_SECRET);
     req.user = user;
@@ -179,6 +189,55 @@ app.post('/api/admin/migrate-3-phase', async (req, res) => {
       error: '3-phase migration failed',
       details: error.message
     });
+  }
+});
+
+// Dev login route (only for jelledekeersmaecker@gmail.com)
+app.post('/api/auth/dev-login', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Only allow specific email in dev mode
+    if (email !== 'jelledekeersmaecker@gmail.com') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Create or get the dev user
+    const userResult = await db.query(
+      'SELECT id, email, name, role FROM users WHERE email = $1',
+      [email]
+    );
+
+    let user;
+    if (userResult.rows.length === 0) {
+      // Create dev user if doesn't exist
+      const createResult = await db.query(
+        'INSERT INTO users (email, name, role, password) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
+        [email, 'Jelle De Keersmaecker', 'administrator', 'dev']
+      );
+      user = createResult.rows[0];
+    } else {
+      user = userResult.rows[0];
+    }
+
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Dev login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

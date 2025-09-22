@@ -981,6 +981,12 @@ app.post('/api/admin/migrate', async (req, res) => {
         return res.status(400).json({ error: 'Email, password and name are required' });
       }
 
+      // First, update the role constraint to allow administrator
+      await db.query(`
+        ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+        ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('student', 'teacher', 'administrator'));
+      `);
+
       // Check if admin already exists
       const existingUser = await db.query(
         'SELECT id FROM users WHERE email = $1',

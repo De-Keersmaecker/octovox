@@ -148,6 +148,40 @@ export default function Practice() {
     }
   }
 
+  const handleAnswerPhase3 = async (wasCorrect: boolean) => {
+    const currentWord = words[currentWordIndex]
+    if (!currentWord || answersDisabled || showFeedback) return
+
+    setAnswersDisabled(true)
+    setIsCorrect(wasCorrect)
+    setSelectedAnswer(typedAnswer)
+
+    // Show immediate feedback
+    setShowFeedback(true)
+    console.log('Phase 3 evaluation:', wasCorrect ? 'correct' : 'incorrect')
+    setWordStatuses(prev => ({
+      ...prev,
+      [currentWord.id]: wasCorrect ? 'green' : 'red'
+    }))
+
+    playFeedbackSound(wasCorrect)
+    await submitAttempt(currentWord.id, wasCorrect, typedAnswer)
+
+    // After 3 seconds, move to next word
+    timeoutRef.current = setTimeout(() => {
+      // If incorrect, change red to orange
+      if (!wasCorrect) {
+        setWordStatuses(prev => ({
+          ...prev,
+          [currentWord.id]: 'orange'
+        }))
+      }
+      // Green stays green
+
+      moveToNextWord(wasCorrect)
+    }, 3000)
+  }
+
   const handleAnswer = async (answer: string, phase: number) => {
     if (answersDisabled || showFeedback) return
 
@@ -403,9 +437,9 @@ export default function Practice() {
     // Check if word is complete
     if (correctedValue.length === targetWord.length && correctedValue.toLowerCase() === targetWord.toLowerCase()) {
       // Word is complete - automatically submit
-      setTimeout(() => {
-        handleAnswer(correctedValue, 3)
-      }, 100) // Small delay to ensure state is updated
+      // Pass the original input directly to check if it was correct without autocorrection
+      const wasCorrect = input.toLowerCase() === targetWord.toLowerCase()
+      handleAnswerPhase3(wasCorrect)
     }
   }
 

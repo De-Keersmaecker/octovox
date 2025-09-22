@@ -963,6 +963,39 @@ app.post('/api/admin/migrate', async (req, res) => {
   }
 });
 
+// Admin: Create admin account (for initial setup)
+app.post('/api/admin/create-admin', async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+
+    // Check if admin already exists
+    const existingUser = await db.query(
+      'SELECT id FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'User already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const result = await db.query(
+      'INSERT INTO users (email, name, password_hash, role, is_verified) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role',
+      [email, name, hashedPassword, 'administrator', true]
+    );
+
+    res.json({
+      success: true,
+      message: 'Administrator account created successfully',
+      user: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Create admin error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Admin: Delete word list
 app.delete('/api/admin/word-lists/:listId', authenticateToken, requireAdmin, async (req, res) => {
   try {

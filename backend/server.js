@@ -1082,7 +1082,7 @@ app.delete('/api/admin/word-lists/:listId', authenticateToken, requireAdmin, asy
 });
 
 // Admin: Upload Excel file and parse words
-app.post('/api/admin/upload-excel', authenticateToken, requireAdmin, upload.single('excelFile'), async (req, res) => {
+app.post('/api/admin/upload-excel', authenticateToken, requireAdmin, upload.single('excel'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
@@ -1215,6 +1215,68 @@ app.post('/api/admin/upload-excel', authenticateToken, requireAdmin, upload.sing
     }
 
     res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
+
+// Admin: Add word to list
+app.post('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { listId } = req.params;
+    const { word, definition, example } = req.body;
+
+    if (!word || !definition || !example) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Validate asterisk in example
+    const wordInExample = example.match(/\*([^*]+)\*/)?.[1];
+    if (!wordInExample || wordInExample.toLowerCase() !== word.toLowerCase()) {
+      return res.status(400).json({ error: 'Example sentence must contain word between *asterisks*' });
+    }
+
+    // Check if list exists
+    const listCheck = await db.query(
+      'SELECT id FROM word_lists WHERE id = $1',
+      [listId]
+    );
+
+    if (listCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Word list not found' });
+    }
+
+    // Insert word
+    const result = await db.query(
+      'INSERT INTO words (list_id, base_form, definition, example_sentence, is_active) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [listId, word, definition, example, true]
+    );
+
+    // Update list timestamp
+    await db.query(
+      'UPDATE word_lists SET updated_at = NOW() WHERE id = $1',
+      [listId]
+    );
+
+    res.json({ word: result.rows[0] });
+  } catch (error) {
+    console.error('Add word error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Admin: Get words for a list
+app.get('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { listId } = req.params;
+
+    const result = await db.query(
+      'SELECT * FROM words WHERE list_id = $1 ORDER BY created_at DESC',
+      [listId]
+    );
+
+    res.json({ words: result.rows });
+  } catch (error) {
+    console.error('Get words error:', error);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 

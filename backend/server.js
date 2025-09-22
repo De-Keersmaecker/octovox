@@ -951,6 +951,18 @@ app.post('/api/admin/word-lists', authenticateToken, requireAdmin, async (req, r
   }
 });
 
+// Admin: Run migration
+app.post('/api/admin/migrate', async (req, res) => {
+  try {
+    const { migrateAdminFeatures } = require('./migrate-admin');
+    await migrateAdminFeatures();
+    res.json({ success: true, message: 'Admin migration completed successfully' });
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({ error: 'Migration failed', details: error.message });
+  }
+});
+
 // Admin: Delete word list
 app.delete('/api/admin/word-lists/:listId', authenticateToken, requireAdmin, async (req, res) => {
   try {

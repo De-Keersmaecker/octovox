@@ -48,7 +48,7 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-6xl font-bold mb-2">OCTOVOX</h1>
-          <p className="text-lg">Vocabulary Learning Platform</p>
+          <p className="text-lg">Woordenschat Leerplatform</p>
         </div>
 
         <div className="retro-border p-6 bg-black">
@@ -60,7 +60,7 @@ export default function Login() {
                 isStudent ? 'bg-white text-black' : 'bg-black text-white border border-white'
               }`}
             >
-              Student
+              Leerling
             </button>
             <button
               type="button"
@@ -69,7 +69,7 @@ export default function Login() {
                 !isStudent ? 'bg-white text-black' : 'bg-black text-white border border-white'
               }`}
             >
-              Teacher
+              Leraar
             </button>
           </div>
 
@@ -87,7 +87,7 @@ export default function Login() {
 
             {isStudent ? (
               <div>
-                <label className="block text-sm font-bold mb-2">PASSWORD</label>
+                <label className="block text-sm font-bold mb-2">WACHTWOORD</label>
                 <input
                   type="password"
                   value={password}
@@ -98,7 +98,7 @@ export default function Login() {
               </div>
             ) : (
               <div>
-                <label className="block text-sm font-bold mb-2">TEACHER CODE</label>
+                <label className="block text-sm font-bold mb-2">LERAAR CODE</label>
                 <input
                   type="password"
                   value={teacherCode}
@@ -118,7 +118,7 @@ export default function Login() {
               disabled={loading}
               className="retro-button w-full"
             >
-              {loading ? 'LOGGING IN...' : 'LOGIN'}
+              {loading ? 'INLOGGEN...' : 'INLOGGEN'}
             </button>
           </form>
 
@@ -128,7 +128,7 @@ export default function Login() {
                 href="/register"
                 className="text-white hover:underline font-mono"
               >
-                Need an account? Register here
+                Nog geen account? Registreer hier
               </Link>
             </div>
           )}

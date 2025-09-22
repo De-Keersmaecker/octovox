@@ -76,6 +76,13 @@ export default function Practice() {
     }
   }, [])
 
+  useEffect(() => {
+    // Auto-focus typing input in Phase 3
+    if (session?.current_phase === 3 && inputRef.current && !showFeedback) {
+      inputRef.current.focus()
+    }
+  }, [session?.current_phase, currentWordIndex, showFeedback])
+
   const initializeSession = async () => {
     try {
       const sessionResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/session/${listId}`, {
@@ -452,7 +459,7 @@ export default function Practice() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-2xl font-mono">LOADING SESSION...</div>
+        <div className="text-2xl font-mono">SESSIE LADEN...</div>
       </div>
     )
   }
@@ -460,7 +467,7 @@ export default function Practice() {
   if (!session || !battery || words.length === 0) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-2xl font-mono">SESSION ERROR</div>
+        <div className="text-2xl font-mono">SESSIE FOUT</div>
       </div>
     )
   }
@@ -515,13 +522,6 @@ export default function Practice() {
               <div className="font-mono text-sm">FASE {session.current_phase} - {phaseName}</div>
               <div className="font-mono text-xs">Batterij {battery.battery_number}</div>
             </div>
-            <button
-              onClick={togglePause}
-              className="retro-button flex items-center gap-2"
-            >
-              <Pause size={16} />
-              PAUZEER
-            </button>
           </div>
 
           {/* Progress boxes */}
@@ -610,16 +610,13 @@ export default function Practice() {
                 placeholder="Type hier..."
                 autoFocus
               />
-              <p className="text-center text-sm font-mono text-gray-400">
-                Het woord wordt automatisch gecontroleerd wanneer compleet
-              </p>
             </div>
           )}
 
           {/* Feedback message */}
           {showFeedback && (
             <div className={`text-center mt-4 text-xl font-bold ${isCorrect ? 'text-green-500' : 'text-red-500'}`}>
-              {isCorrect ? '✓ GOED!' : '✗ FOUT'}
+              {isCorrect ? '✓ JUIST!' : '✗ FOUT'}
             </div>
           )}
         </div>

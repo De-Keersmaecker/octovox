@@ -5,18 +5,16 @@ import { useRouter } from 'next/navigation'
 import { learning } from '@/lib/api'
 import { LogOut, Play, BookOpen } from 'lucide-react'
 
-interface ProgressItem {
-  listId: string
+interface WordList {
+  id: string
   title: string
-  totalWords: number
-  masteredWords: number
-  learningWords: number
-  unseenWords: number
-  progressPercentage: number
+  theme: string
+  total_words: number
+  active_words: number
 }
 
 export default function Dashboard() {
-  const [progress, setProgress] = useState<ProgressItem[]>([])
+  const [wordLists, setWordLists] = useState<WordList[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
@@ -36,10 +34,10 @@ export default function Dashboard() {
       return
     }
 
-    fetchProgress()
+    fetchWordLists()
   }, [router])
 
-  const fetchProgress = async () => {
+  const fetchWordLists = async () => {
     try {
       // Fetch available word lists
       const listsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/word-lists`, {
@@ -52,10 +50,6 @@ export default function Dashboard() {
         const listsData = await listsResponse.json()
         setWordLists(listsData.wordLists || [])
       }
-
-      // Fetch user progress
-      const response = await learning.getProgress()
-      setProgress(response.data.progress)
     } catch (error) {
       console.error('Failed to fetch data:', error)
     } finally {
@@ -88,6 +82,9 @@ export default function Dashboard() {
           <div>
             <h1 className="text-4xl font-bold mb-2">OCTOVOX</h1>
             <p className="text-lg">Welkom terug, {user?.name}</p>
+            {user?.class_code && (
+              <p className="text-sm opacity-75">Klas: {user.class_code}</p>
+            )}
           </div>
           <button
             onClick={handleLogout}
@@ -98,46 +95,65 @@ export default function Dashboard() {
           </button>
         </header>
 
-        <div className="grid gap-6">
-          <div className="retro-border p-6">
-            {progress.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-lg mb-4">Nog geen woordenlijsten toegewezen.</p>
-                <p className="text-sm opacity-75">Neem contact op met je leraar om te beginnen!</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {progress.map((item) => (
-                  <div key={item.listId} className="border border-white p-4 bg-black">
-                    <div className="flex justify-between items-start mb-3">
-                      <h3 className="text-xl font-bold">{item.title}</h3>
-                      <button
-                        onClick={() => startPractice(item.listId)}
-                        className="retro-button flex items-center gap-2 text-sm"
-                      >
-                        <Play size={14} />
-                        {item.masteredWords === 0 ? 'START' : 'VERDER'}
-                      </button>
-                    </div>
+        <div className="retro-border p-6">
+          <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+            <BookOpen size={24} />
+            Beschikbare Woordenlijsten
+          </h2>
 
-                    <div className="mb-3">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Voortgang</span>
-                        <span>{item.masteredWords}/{item.totalWords} woorden</span>
-                      </div>
-                      <div className="w-full bg-gray-800 border border-white">
-                        <div
-                          className="bg-white h-2"
-                          style={{ width: `${item.progressPercentage}%` }}
-                        />
+          {wordLists.length === 0 ? (
+            <div className="text-center py-12">
+              <BookOpen size={64} className="mx-auto mb-4 opacity-30" />
+              <h3 className="text-xl font-bold mb-2">Nog geen woordenlijsten beschikbaar</h3>
+              <p className="text-lg mb-2">Er zijn nog geen woordenlijsten toegewezen aan jouw klas.</p>
+              <p className="text-sm opacity-75">Neem contact op met je leraar om woordenlijsten toegewezen te krijgen!</p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              {wordLists.map((list) => (
+                <div key={list.id} className="retro-border p-6 bg-gray-900 hover:bg-gray-800 transition-colors">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-2xl font-bold mb-2">{list.title}</h3>
+                      {list.theme && (
+                        <p className="text-lg opacity-75 mb-2">📚 Thema: {list.theme}</p>
+                      )}
+                      <div className="flex gap-4 text-sm opacity-75">
+                        <span>✨ {list.active_words} actieve woorden</span>
+                        <span>📝 {list.total_words} totaal</span>
                       </div>
                     </div>
+                    <button
+                      onClick={() => startPractice(list.id)}
+                      className="retro-button bg-green-600 hover:bg-green-700 flex items-center gap-2 text-lg px-6 py-3"
+                    >
+                      <Play size={20} />
+                      START OEFENING
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {wordLists.length > 0 && (
+          <div className="mt-8 retro-border p-6 bg-gray-900">
+            <h3 className="text-xl font-bold mb-4">🎯 Tips voor Effectief Oefenen</h3>
+            <div className="grid md:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-2">
+                <p>• Oefen regelmatig, liefst dagelijks</p>
+                <p>• Focus op de woorden die je moeilijk vindt</p>
+                <p>• Probeer de woorden in zinnen te gebruiken</p>
+              </div>
+              <div className="space-y-2">
+                <p>• Herhaal moeilijke woorden meerdere keren</p>
+                <p>• Oefen zowel de betekenis als de spelling</p>
+                <p>• Vraag hulp aan je leraar bij twijfels</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

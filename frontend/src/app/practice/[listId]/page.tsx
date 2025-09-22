@@ -437,8 +437,15 @@ export default function Practice() {
     // Check if word is complete
     if (correctedValue.length === targetWord.length && correctedValue.toLowerCase() === targetWord.toLowerCase()) {
       // Word is complete - automatically submit
-      // Pass the original input directly to check if it was correct without autocorrection
-      const wasCorrect = input.toLowerCase() === targetWord.toLowerCase()
+      // Correct only if: original input matches exactly AND no autocorrection was applied
+      const wasCorrect = input.toLowerCase() === targetWord.toLowerCase() && !autocorrectApplied
+      console.log('Phase 3 completion check:', {
+        originalInput: input,
+        targetWord: targetWord,
+        inputMatches: input.toLowerCase() === targetWord.toLowerCase(),
+        autocorrectApplied: autocorrectApplied,
+        finalResult: wasCorrect
+      })
       handleAnswerPhase3(wasCorrect)
     }
   }

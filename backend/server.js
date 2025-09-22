@@ -44,6 +44,12 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+// Ensure uploads directory exists
+const uploadsDir = './uploads';
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 // Configure multer for file uploads
 const upload = multer({
   dest: 'uploads/',
@@ -1088,8 +1094,17 @@ app.post('/api/admin/upload-excel', authenticateToken, requireAdmin, upload.sing
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
-    const { listId, title, theme } = req.body;
+    const { listId, title, theme, preview } = req.body;
     const adminId = req.user.userId;
+
+    console.log('Excel upload received:', {
+      filename: req.file.originalname,
+      size: req.file.size,
+      listId,
+      title,
+      theme,
+      preview
+    });
 
     // Read the Excel file
     const workbook = XLSX.readFile(req.file.path);
@@ -1141,6 +1156,29 @@ app.post('/api/admin/upload-excel', authenticateToken, requireAdmin, upload.sing
       return res.status(400).json({
         error: 'No valid words found in Excel file',
         errors
+      });
+    }
+
+    // If this is just a preview request, return the parsed data
+    if (preview === 'true') {
+      fs.unlinkSync(req.file.path); // Clean up file
+
+      const wordsWithValidation = validWords.map((word, index) => ({
+        word: word.base_form,
+        definition: word.definition,
+        example: word.example_sentence,
+        valid: true
+      }));
+
+      return res.json({
+        preview: {
+          fileName: req.file.originalname,
+          totalRows: data.length - 1, // Exclude header
+          validRows: validWords.length,
+          invalidRows: errors.length,
+          errors,
+          words: wordsWithValidation
+        }
       });
     }
 

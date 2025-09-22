@@ -17,6 +17,8 @@ export default function DevRoleSwitcher() {
 
   const switchRole = async (newRole: 'student' | 'teacher' | 'administrator') => {
     try {
+      console.log('Switching to role:', newRole)
+
       // Call dev login endpoint with new role
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/dev-login`, {
         method: 'POST',
@@ -29,8 +31,11 @@ export default function DevRoleSwitcher() {
         })
       })
 
+      console.log('Response status:', response.status)
+
       if (response.ok) {
         const data = await response.json()
+        console.log('Response data:', data)
 
         // Store new token and user data
         localStorage.setItem('token', data.token)
@@ -38,23 +43,29 @@ export default function DevRoleSwitcher() {
 
         setCurrentRole(newRole)
 
-        // Redirect based on role
-        switch (newRole) {
-          case 'student':
-            router.push('/dashboard')
-            break
-          case 'teacher':
-            router.push('/teacher/dashboard')
-            break
-          case 'administrator':
-            router.push('/admin/dashboard')
-            break
-        }
+        // Small delay to ensure state updates
+        setTimeout(() => {
+          // Redirect based on role
+          switch (newRole) {
+            case 'student':
+              router.push('/dashboard')
+              break
+            case 'teacher':
+              router.push('/teacher/dashboard')
+              break
+            case 'administrator':
+              router.push('/admin/dashboard')
+              break
+          }
+        }, 100)
       } else {
-        console.error('Failed to switch role')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Failed to switch role:', response.status, errorData)
+        alert(`Failed to switch role: ${errorData.message || errorData.error || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error switching role:', error)
+      alert(`Error switching role: ${error.message || 'Unknown error'}`)
     }
   }
 

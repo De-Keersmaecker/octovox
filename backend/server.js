@@ -284,61 +284,94 @@ app.post('/api/auth/dev-login', async (req, res) => {
   try {
     const { email, role } = req.body;
 
+    console.log('Dev login request:', { email, role });
+
     // Only allow specific email in dev mode
     if (email !== 'jelledekeersmaecker@gmail.com') {
+      console.log('Unauthorized email:', email);
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Use provided role or default to administrator
     const userRole = role || 'administrator';
+    console.log('Using role:', userRole);
 
-    // Create or get the dev user
-    const userResult = await db.query(
-      'SELECT id, email, name FROM users WHERE email = $1',
-      [email]
-    );
-
-    let userId;
-    let userName;
-
-    if (userResult.rows.length === 0) {
-      // Create dev user if doesn't exist
-      const createResult = await db.query(
-        'INSERT INTO users (email, name, role, password, class_code) VALUES ($1, $2, $3, $4, $5) RETURNING id, name',
-        [email, 'Jelle De Keersmaecker', userRole, 'dev', userRole === 'student' ? 'CLASS2024' : null]
+    try {
+      // Create or get the dev user
+      const userResult = await db.query(
+        'SELECT id, email, name FROM users WHERE email = $1',
+        [email]
       );
-      userId = createResult.rows[0].id;
-      userName = createResult.rows[0].name;
-    } else {
-      userId = userResult.rows[0].id;
-      userName = userResult.rows[0].name;
 
-      // Update role and class_code if changed
-      await db.query(
-        'UPDATE users SET role = $1, class_code = $2 WHERE id = $3',
-        [userRole, userRole === 'student' ? 'CLASS2024' : null, userId]
+      console.log('User query result:', userResult.rows);
+
+      let userId;
+      let userName = 'Jelle De Keersmaecker';
+
+      if (userResult.rows.length === 0) {
+        console.log('Creating new dev user...');
+        // Create dev user if doesn't exist
+        try {
+          const createResult = await db.query(
+            'INSERT INTO users (email, name, role, password, class_code) VALUES ($1, $2, $3, $4, $5) RETURNING id, name',
+            [email, userName, userRole, 'dev', userRole === 'student' ? 'CLASS2024' : null]
+          );
+          userId = createResult.rows[0].id;
+          userName = createResult.rows[0].name;
+          console.log('Created user:', { userId, userName });
+        } catch (insertError) {
+          console.error('Error creating user:', insertError);
+          throw insertError;
+        }
+      } else {
+        userId = userResult.rows[0].id;
+        userName = userResult.rows[0].name || 'Jelle De Keersmaecker';
+
+        console.log('Updating existing user role...');
+        // Update role and class_code if changed
+        try {
+          await db.query(
+            'UPDATE users SET role = $1, class_code = $2 WHERE id = $3',
+            [userRole, userRole === 'student' ? 'CLASS2024' : null, userId]
+          );
+          console.log('Updated user role to:', userRole);
+        } catch (updateError) {
+          console.error('Error updating user:', updateError);
+          throw updateError;
+        }
+      }
+
+      const token = jwt.sign(
+        { userId, email, role: userRole },
+        process.env.JWT_SECRET,
+        { expiresIn: '7d' }
       );
+
+      console.log('Sending response for user:', { userId, userName, userRole });
+
+      res.json({
+        token,
+        user: {
+          id: userId,
+          email,
+          name: userName,
+          role: userRole,
+          class_code: userRole === 'student' ? 'CLASS2024' : null
+        }
+      });
+
+    } catch (dbError) {
+      console.error('Database error in dev-login:', dbError);
+      throw dbError;
     }
 
-    const token = jwt.sign(
-      { userId, email, role: userRole },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({
-      token,
-      user: {
-        id: userId,
-        email,
-        name: userName,
-        role: userRole,
-        class_code: userRole === 'student' ? 'CLASS2024' : null
-      }
-    });
   } catch (error) {
     console.error('Dev login error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
 

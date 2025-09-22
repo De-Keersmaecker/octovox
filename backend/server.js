@@ -708,6 +708,43 @@ app.post('/api/learning/session/:sessionId/resume', authenticateToken, requireRo
   }
 });
 
+// Move to next phase with current battery words
+app.post('/api/learning/session/next-phase', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { sessionId } = req.body;
+
+    // Verify session belongs to user
+    const session = await db.query(
+      'SELECT * FROM learning_sessions WHERE id = $1 AND user_id = $2',
+      [sessionId, userId]
+    );
+
+    if (session.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const currentSession = session.rows[0];
+
+    if (currentSession.current_phase >= 3) {
+      return res.status(400).json({ error: 'Already at final phase' });
+    }
+
+    // Move to next phase, keep same battery number (start over with same words)
+    await db.query(
+      `UPDATE learning_sessions
+       SET current_phase = $1, updated_at = NOW()
+       WHERE id = $2`,
+      [currentSession.current_phase + 1, sessionId]
+    );
+
+    res.json({ success: true, message: 'Moved to next phase' });
+  } catch (error) {
+    console.error('Next phase error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Complete battery and progress to next
 app.post('/api/learning/battery/complete', authenticateToken, requireRole('student'), async (req, res) => {
   try {

@@ -258,8 +258,8 @@ export default function Practice() {
         })
 
         if (orangeWords.length === 0) {
-          // All green in first round!
-          completeBattery()
+          // All green in first round! Check if we should go to next phase
+          checkPhaseProgression()
         } else {
           // Start repeating orange words
           setWordQueue(orangeWords)
@@ -282,7 +282,7 @@ export default function Practice() {
 
       if (newQueue.length === 0) {
         // All words are green!
-        completeBattery()
+        checkPhaseProgression()
       } else {
         // Move to next orange word
         const nextWordId = newQueue[0]
@@ -290,6 +290,34 @@ export default function Practice() {
         setCurrentWordIndex(nextIndex)
         setWordQueue(newQueue)
       }
+    }
+  }
+
+  const checkPhaseProgression = async () => {
+    if (!session) return
+
+    try {
+      if (session.current_phase < 3) {
+        // Move to next phase with same words
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/session/next-phase`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sessionId: session.id
+          })
+        })
+
+        // Reload session to get next phase
+        initializeSession()
+      } else {
+        // Phase 3 complete, check if all words in list are done
+        completeBattery()
+      }
+    } catch (error) {
+      console.error('Failed to progress phase:', error)
     }
   }
 

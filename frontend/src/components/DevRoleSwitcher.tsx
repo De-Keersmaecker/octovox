@@ -55,8 +55,15 @@ export default function DevRoleSwitcher() {
     }
   }
 
-  // Only show in development mode
-  if (process.env.NODE_ENV === 'production') {
+  // Show for specific developer email or in development mode
+  const userData = localStorage.getItem('user')
+  if (userData) {
+    const user = JSON.parse(userData)
+    // Always show for your email
+    if (user.email !== 'jelledekeersmaecker@gmail.com' && process.env.NODE_ENV === 'production') {
+      return null
+    }
+  } else if (process.env.NODE_ENV === 'production') {
     return null
   }
 

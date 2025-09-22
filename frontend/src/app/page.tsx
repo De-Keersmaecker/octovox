@@ -14,8 +14,8 @@ export default function Home() {
         const user = JSON.parse(userData)
         if (user.role === 'student') {
           router.push('/dashboard')
-        } else if (user.role === 'teacher') {
-          router.push('/teacher')
+        } else if (user.role === 'teacher' || user.role === 'administrator') {
+          router.push('/admin')
         }
       }
     } else {

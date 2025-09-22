@@ -34,7 +34,7 @@ export default function Login() {
       if (user.role === 'student') {
         router.push('/dashboard')
       } else {
-        router.push('/teacher')
+        router.push('/admin')
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed')

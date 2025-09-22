@@ -930,6 +930,38 @@ app.get('/api/admin/word-lists', authenticateToken, requireAdmin, async (req, re
   }
 });
 
+// Admin: Get a specific word list
+app.get('/api/admin/word-lists/:listId', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { listId } = req.params;
+
+    const result = await db.query(
+      `SELECT
+        wl.id,
+        wl.title,
+        wl.theme,
+        wl.created_at,
+        wl.updated_at,
+        COUNT(w.id) as total_words,
+        COUNT(CASE WHEN w.is_active = true THEN 1 END) as active_words
+      FROM word_lists wl
+      LEFT JOIN words w ON wl.id = w.list_id
+      WHERE wl.id = $1
+      GROUP BY wl.id`,
+      [listId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Word list not found' });
+    }
+
+    res.json({ wordList: result.rows[0] });
+  } catch (error) {
+    console.error('Get word list error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Admin: Get words for a specific list
 app.get('/api/admin/word-lists/:listId/words', authenticateToken, requireAdmin, async (req, res) => {
   try {

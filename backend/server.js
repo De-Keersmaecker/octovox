@@ -404,6 +404,39 @@ app.post('/api/auth/teacher-login', async (req, res) => {
 // Get available word lists for students
 app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), async (req, res) => {
   try {
+    const userId = req.user.userId;
+
+    // Get student's class
+    const userResult = await db.query(
+      'SELECT class_code FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const classCode = userResult.rows[0].class_code;
+
+    if (!classCode) {
+      // If student has no class, show all active lists
+      const wordLists = await db.query(
+        `SELECT
+          wl.id,
+          wl.title,
+          wl.theme,
+          COUNT(w.id) as total_words,
+          COUNT(CASE WHEN w.is_active = true THEN 1 END) as active_words
+        FROM word_lists wl
+        LEFT JOIN words w ON wl.id = w.list_id
+        GROUP BY wl.id
+        HAVING COUNT(CASE WHEN w.is_active = true THEN 1 END) > 0
+        ORDER BY wl.created_at DESC`
+      );
+      return res.json({ wordLists: wordLists.rows });
+    }
+
+    // Get word lists assigned to student's class
     const wordLists = await db.query(
       `SELECT
         wl.id,
@@ -412,10 +445,13 @@ app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), a
         COUNT(w.id) as total_words,
         COUNT(CASE WHEN w.is_active = true THEN 1 END) as active_words
       FROM word_lists wl
+      INNER JOIN class_word_lists cwl ON wl.id = cwl.list_id
       LEFT JOIN words w ON wl.id = w.list_id
-      GROUP BY wl.id
+      WHERE cwl.class_code = $1 AND cwl.is_active = true
+      GROUP BY wl.id, wl.title, wl.theme, wl.created_at
       HAVING COUNT(CASE WHEN w.is_active = true THEN 1 END) > 0
-      ORDER BY wl.created_at DESC`
+      ORDER BY wl.created_at DESC`,
+      [classCode]
     );
 
     res.json({ wordLists: wordLists.rows });
@@ -1004,6 +1040,126 @@ const requireAdmin = (req, res, next) => {
 };
 
 // Teacher routes
+
+// Get classes and their assigned word lists
+app.get('/api/teacher/classes', authenticateToken, async (req, res) => {
+  try {
+    const classes = await db.query(
+      `SELECT
+        c.code,
+        c.name,
+        COUNT(DISTINCT u.id) as student_count,
+        COUNT(DISTINCT cwl.list_id) as assigned_lists
+      FROM classes c
+      LEFT JOIN users u ON c.code = u.class_code AND u.role = 'student'
+      LEFT JOIN class_word_lists cwl ON c.code = cwl.class_code AND cwl.is_active = true
+      GROUP BY c.code, c.name
+      ORDER BY c.code`
+    );
+
+    res.json({ classes: classes.rows });
+  } catch (error) {
+    console.error('Get classes error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get assigned word lists for a specific class
+app.get('/api/teacher/classes/:classCode/word-lists', authenticateToken, async (req, res) => {
+  try {
+    const { classCode } = req.params;
+
+    const wordLists = await db.query(
+      `SELECT
+        wl.id,
+        wl.title,
+        wl.theme,
+        COUNT(w.id) as total_words,
+        COUNT(CASE WHEN w.is_active = true THEN 1 END) as active_words,
+        cwl.assigned_at,
+        cwl.is_active as is_assigned
+      FROM word_lists wl
+      LEFT JOIN class_word_lists cwl ON wl.id = cwl.list_id AND cwl.class_code = $1
+      LEFT JOIN words w ON wl.id = w.list_id
+      GROUP BY wl.id, wl.title, wl.theme, wl.created_at, cwl.assigned_at, cwl.is_active
+      ORDER BY cwl.is_active DESC NULLS LAST, wl.title`,
+      [classCode]
+    );
+
+    res.json({ wordLists: wordLists.rows });
+  } catch (error) {
+    console.error('Get class word lists error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Assign/unassign word list to class
+app.post('/api/teacher/classes/:classCode/assign-list', authenticateToken, async (req, res) => {
+  try {
+    const { classCode } = req.params;
+    const { listId, assign } = req.body;
+    const teacherId = req.user.userId;
+
+    if (assign) {
+      // Assign list to class
+      await db.query(
+        `INSERT INTO class_word_lists (class_code, list_id, assigned_by, is_active)
+         VALUES ($1, $2, $3, true)
+         ON CONFLICT (class_code, list_id)
+         DO UPDATE SET is_active = true, assigned_by = $3, assigned_at = CURRENT_TIMESTAMP`,
+        [classCode, listId, teacherId]
+      );
+    } else {
+      // Unassign list from class
+      await db.query(
+        'UPDATE class_word_lists SET is_active = false WHERE class_code = $1 AND list_id = $2',
+        [classCode, listId]
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Assign list error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get student results for a class
+app.get('/api/teacher/classes/:classCode/results', authenticateToken, async (req, res) => {
+  try {
+    const { classCode } = req.params;
+
+    const results = await db.query(
+      `SELECT
+        u.id as student_id,
+        u.name as student_name,
+        u.email as student_email,
+        wl.title as list_title,
+        wl.id as list_id,
+        COUNT(pa.id) as total_attempts,
+        SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END) as correct_attempts,
+        CASE
+          WHEN COUNT(pa.id) > 0
+          THEN ROUND((SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END)::DECIMAL / COUNT(pa.id)::DECIMAL * 100), 1)
+          ELSE 0
+        END as accuracy_rate,
+        MAX(pa.attempted_at) as last_attempt
+      FROM users u
+      LEFT JOIN practice_attempts pa ON u.id = pa.user_id
+      LEFT JOIN words w ON pa.word_id = w.id
+      LEFT JOIN word_lists wl ON w.list_id = wl.id
+      WHERE u.class_code = $1 AND u.role = 'student'
+      GROUP BY u.id, u.name, u.email, wl.id, wl.title
+      ORDER BY u.name, wl.title`,
+      [classCode]
+    );
+
+    res.json({ results: results.rows });
+  } catch (error) {
+    console.error('Get class results error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Get word lists for teachers
 app.get('/api/teacher/word-lists', authenticateToken, async (req, res) => {

@@ -15,43 +15,46 @@ export default function DevRoleSwitcher() {
     }
   }, [])
 
-  const switchRole = (newRole: 'student' | 'teacher' | 'administrator') => {
-    // Get current user data
-    const userData = localStorage.getItem('user')
-    if (!userData) {
-      // Create a development user if none exists
-      const devUser = {
-        id: 'dev-user',
-        email: 'jelledekeersmaecker@gmail.com',
-        name: 'Jelle De Keersmaecker',
-        role: newRole
+  const switchRole = async (newRole: 'student' | 'teacher' | 'administrator') => {
+    try {
+      // Call dev login endpoint with new role
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/dev-login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: 'jelledekeersmaecker@gmail.com',
+          role: newRole
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+
+        // Store new token and user data
+        localStorage.setItem('token', data.token)
+        localStorage.setItem('user', JSON.stringify(data.user))
+
+        setCurrentRole(newRole)
+
+        // Redirect based on role
+        switch (newRole) {
+          case 'student':
+            router.push('/dashboard')
+            break
+          case 'teacher':
+            router.push('/teacher/dashboard')
+            break
+          case 'administrator':
+            router.push('/admin/dashboard')
+            break
+        }
+      } else {
+        console.error('Failed to switch role')
       }
-      localStorage.setItem('user', JSON.stringify(devUser))
-
-      // Set a dev token if none exists
-      if (!localStorage.getItem('token')) {
-        localStorage.setItem('token', 'dev-token-' + Date.now())
-      }
-    } else {
-      // Update existing user role
-      const user = JSON.parse(userData)
-      user.role = newRole
-      localStorage.setItem('user', JSON.stringify(user))
-    }
-
-    setCurrentRole(newRole)
-
-    // Redirect based on role
-    switch (newRole) {
-      case 'student':
-        router.push('/dashboard')
-        break
-      case 'teacher':
-        router.push('/teacher/dashboard')
-        break
-      case 'administrator':
-        router.push('/admin/dashboard')
-        break
+    } catch (error) {
+      console.error('Error switching role:', error)
     }
   }
 

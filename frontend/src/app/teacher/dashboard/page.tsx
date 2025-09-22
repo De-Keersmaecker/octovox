@@ -231,25 +231,28 @@ export default function TeacherDashboard() {
         {/* Quick Actions */}
         <div className="mt-8 grid grid-cols-3 gap-4">
           <button
-            onClick={() => router.push('/admin/word-lists')}
+            onClick={() => router.push('/teacher/difficulty')}
+            className="retro-border p-6 hover:bg-white hover:text-black transition-colors"
+          >
+            <div className="text-2xl mb-2">📊</div>
+            <div className="font-mono font-bold">MOEILIJKHEIDSGRAAD</div>
+            <div className="text-xs opacity-75 mt-1">Bekijk welke woorden moeilijk zijn</div>
+          </button>
+          <button
+            onClick={() => router.push('/admin/dashboard')}
             className="retro-border p-6 hover:bg-white hover:text-black transition-colors"
           >
             <BookOpen size={24} className="mx-auto mb-2" />
-            <div className="font-mono font-bold">WOORDENLIJSTEN BEHEREN</div>
+            <div className="font-mono font-bold">WOORDENLIJSTEN</div>
+            <div className="text-xs opacity-75 mt-1">Beheer woorden en lijsten</div>
           </button>
           <button
-            onClick={() => router.push('/teacher/reports')}
-            className="retro-border p-6 hover:bg-white hover:text-black transition-colors"
-          >
-            <TrendingUp size={24} className="mx-auto mb-2" />
-            <div className="font-mono font-bold">RAPPORTEN GENEREREN</div>
-          </button>
-          <button
-            onClick={() => router.push('/teacher/settings')}
+            onClick={() => router.push('/teacher/classes')}
             className="retro-border p-6 hover:bg-white hover:text-black transition-colors"
           >
             <Users size={24} className="mx-auto mb-2" />
-            <div className="font-mono font-bold">KLAS INSTELLINGEN</div>
+            <div className="font-mono font-bold">KLASSEN BEHEER</div>
+            <div className="text-xs opacity-75 mt-1">Beheer leerlingen en klassen</div>
           </button>
         </div>
       </div>

@@ -41,10 +41,23 @@ export default function Dashboard() {
 
   const fetchProgress = async () => {
     try {
+      // Fetch available word lists
+      const listsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/word-lists`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+
+      if (listsResponse.ok) {
+        const listsData = await listsResponse.json()
+        setWordLists(listsData.wordLists || [])
+      }
+
+      // Fetch user progress
       const response = await learning.getProgress()
       setProgress(response.data.progress)
     } catch (error) {
-      console.error('Failed to fetch progress:', error)
+      console.error('Failed to fetch data:', error)
     } finally {
       setLoading(false)
     }

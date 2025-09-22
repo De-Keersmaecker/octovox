@@ -195,33 +195,46 @@ app.post('/api/admin/migrate-3-phase', async (req, res) => {
 // Dev login route (only for jelledekeersmaecker@gmail.com)
 app.post('/api/auth/dev-login', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, role } = req.body;
 
     // Only allow specific email in dev mode
     if (email !== 'jelledekeersmaecker@gmail.com') {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
+    // Use provided role or default to administrator
+    const userRole = role || 'administrator';
+
     // Create or get the dev user
     const userResult = await db.query(
-      'SELECT id, email, name, role FROM users WHERE email = $1',
+      'SELECT id, email, name FROM users WHERE email = $1',
       [email]
     );
 
-    let user;
+    let userId;
+    let userName;
+
     if (userResult.rows.length === 0) {
       // Create dev user if doesn't exist
       const createResult = await db.query(
-        'INSERT INTO users (email, name, role, password) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
-        [email, 'Jelle De Keersmaecker', 'administrator', 'dev']
+        'INSERT INTO users (email, name, role, password, class_code) VALUES ($1, $2, $3, $4, $5) RETURNING id, name',
+        [email, 'Jelle De Keersmaecker', userRole, 'dev', userRole === 'student' ? 'CLASS2024' : null]
       );
-      user = createResult.rows[0];
+      userId = createResult.rows[0].id;
+      userName = createResult.rows[0].name;
     } else {
-      user = userResult.rows[0];
+      userId = userResult.rows[0].id;
+      userName = userResult.rows[0].name;
+
+      // Update role and class_code if changed
+      await db.query(
+        'UPDATE users SET role = $1, class_code = $2 WHERE id = $3',
+        [userRole, userRole === 'student' ? 'CLASS2024' : null, userId]
+      );
     }
 
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
+      { userId, email, role: userRole },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
@@ -229,10 +242,11 @@ app.post('/api/auth/dev-login', async (req, res) => {
     res.json({
       token,
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role
+        id: userId,
+        email,
+        name: userName,
+        role: userRole,
+        class_code: userRole === 'student' ? 'CLASS2024' : null
       }
     });
   } catch (error) {
@@ -386,6 +400,31 @@ app.post('/api/auth/teacher-login', async (req, res) => {
 });
 
 // Learning routes (for students)
+
+// Get available word lists for students
+app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const wordLists = await db.query(
+      `SELECT
+        wl.id,
+        wl.title,
+        wl.theme,
+        COUNT(w.id) as total_words,
+        COUNT(CASE WHEN w.is_active = true THEN 1 END) as active_words
+      FROM word_lists wl
+      LEFT JOIN words w ON wl.id = w.list_id
+      GROUP BY wl.id
+      HAVING COUNT(CASE WHEN w.is_active = true THEN 1 END) > 0
+      ORDER BY wl.created_at DESC`
+    );
+
+    res.json({ wordLists: wordLists.rows });
+  } catch (error) {
+    console.error('Get word lists error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 app.get('/api/learning/practice/:listId?', authenticateToken, requireRole('student'), async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -963,6 +1002,107 @@ const requireAdmin = (req, res, next) => {
   }
   return res.status(403).json({ error: 'Administrator access required' });
 };
+
+// Teacher routes
+
+// Get word lists for teachers
+app.get('/api/teacher/word-lists', authenticateToken, async (req, res) => {
+  try {
+    const wordLists = await db.query(
+      `SELECT
+        wl.id,
+        wl.title,
+        wl.theme,
+        COUNT(w.id) as total_words
+      FROM word_lists wl
+      LEFT JOIN words w ON wl.id = w.list_id
+      GROUP BY wl.id
+      ORDER BY wl.title`
+    );
+
+    res.json({ wordLists: wordLists.rows });
+  } catch (error) {
+    console.error('Get teacher word lists error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Get word difficulty statistics
+app.get('/api/teacher/word-difficulty', authenticateToken, async (req, res) => {
+  try {
+    const { scope, classCode, listId } = req.query;
+    const userRole = req.user.role;
+
+    let whereClause = '';
+    const params = [];
+    let paramIndex = 1;
+
+    // Build WHERE clause based on scope and filters
+    if (scope === 'class' && classCode && classCode !== 'all') {
+      whereClause = `WHERE u.class_code = $${paramIndex}`;
+      params.push(classCode);
+      paramIndex++;
+    } else if (scope === 'teacher') {
+      // Teacher sees all their classes combined
+      whereClause = ''; // No filter for teacher view
+    } else if (scope === 'global' && userRole === 'administrator') {
+      // Admin sees everything
+      whereClause = '';
+    }
+
+    if (listId && listId !== 'all') {
+      whereClause += whereClause ? ` AND w.list_id = $${paramIndex}` : ` WHERE w.list_id = $${paramIndex}`;
+      params.push(listId);
+    }
+
+    // Get word difficulty data
+    const query = `
+      WITH word_stats AS (
+        SELECT
+          w.id,
+          w.base_form as word,
+          w.definition,
+          wl.title as list_title,
+          wl.id as list_id,
+          COUNT(pa.id) as total_attempts,
+          SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END) as correct_attempts,
+          CASE
+            WHEN COUNT(pa.id) > 0
+            THEN (SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END)::DECIMAL / COUNT(pa.id)::DECIMAL * 100)
+            ELSE 0
+          END as accuracy_rate
+        FROM words w
+        INNER JOIN word_lists wl ON w.list_id = wl.id
+        LEFT JOIN practice_attempts pa ON w.id = pa.word_id
+        LEFT JOIN users u ON pa.user_id = u.id
+        ${whereClause}
+        GROUP BY w.id, w.base_form, w.definition, wl.title, wl.id
+        HAVING COUNT(pa.id) > 0
+      )
+      SELECT *,
+        (100 - accuracy_rate) as difficulty_score
+      FROM word_stats
+      ORDER BY accuracy_rate ASC, total_attempts DESC`;
+
+    const result = await db.query(query, params);
+
+    // Calculate statistics
+    const words = result.rows;
+    const stats = {
+      mostDifficult: words.filter(w => w.accuracy_rate < 40),
+      easiest: words.filter(w => w.accuracy_rate >= 80),
+      averageAccuracy: words.length > 0
+        ? words.reduce((acc, w) => acc + parseFloat(w.accuracy_rate), 0) / words.length
+        : 0,
+      totalWordsTracked: words.length
+    };
+
+    res.json({ words, stats });
+  } catch (error) {
+    console.error('Get word difficulty error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Admin: Get all word lists with statistics
 app.get('/api/admin/word-lists', authenticateToken, requireAdmin, async (req, res) => {

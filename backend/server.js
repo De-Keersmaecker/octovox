@@ -230,9 +230,10 @@ app.post('/api/dev/run-migrations', async (req, res) => {
       END $$
     `);
 
-    // Create classes table if it doesn't exist
+    // Drop and recreate classes table to ensure correct schema
+    await db.query(`DROP TABLE IF EXISTS classes CASCADE`);
     await db.query(`
-      CREATE TABLE IF NOT EXISTS classes (
+      CREATE TABLE classes (
         id SERIAL PRIMARY KEY,
         code VARCHAR(50) UNIQUE NOT NULL,
         name VARCHAR(255) NOT NULL,
@@ -242,9 +243,10 @@ app.post('/api/dev/run-migrations', async (req, res) => {
       )
     `);
 
-    // Create class_word_lists table if it doesn't exist
+    // Drop and recreate class_word_lists table to ensure correct schema
+    await db.query(`DROP TABLE IF EXISTS class_word_lists CASCADE`);
     await db.query(`
-      CREATE TABLE IF NOT EXISTS class_word_lists (
+      CREATE TABLE class_word_lists (
         id SERIAL PRIMARY KEY,
         class_code VARCHAR(50) NOT NULL,
         list_id INTEGER NOT NULL,

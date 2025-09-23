@@ -673,6 +673,7 @@ app.post('/api/auth/teacher-login', async (req, res) => {
 app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), async (req, res) => {
   try {
     const userId = req.user.userId;
+    console.log('Getting word lists for student:', userId);
 
     // Get student's class
     const userResult = await db.query(
@@ -685,6 +686,7 @@ app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), a
     }
 
     const classCode = userResult.rows[0].class_code;
+    console.log('Student class code:', classCode);
 
     if (!classCode) {
       // If student has no class, show all active lists
@@ -705,6 +707,8 @@ app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), a
     }
 
     // Get word lists assigned to student's class
+    console.log('Getting assigned word lists for class:', classCode);
+
     const wordLists = await db.query(
       `SELECT
         wl.id,
@@ -713,7 +717,7 @@ app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), a
         COUNT(w.id) as total_words,
         COUNT(CASE WHEN w.is_active = true THEN 1 END) as active_words
       FROM word_lists wl
-      INNER JOIN class_word_lists cwl ON wl.id = cwl.list_id
+      INNER JOIN class_word_lists cwl ON wl.id::text = cwl.list_id::text
       LEFT JOIN words w ON wl.id = w.list_id
       WHERE cwl.class_code = $1 AND cwl.is_active = true
       GROUP BY wl.id, wl.title, wl.theme, wl.created_at
@@ -722,10 +726,11 @@ app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), a
       [classCode]
     );
 
+    console.log('Found word lists for student:', wordLists.rows.length);
     res.json({ wordLists: wordLists.rows });
   } catch (error) {
-    console.error('Get word lists error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Get word lists error:', error.message, error.stack);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

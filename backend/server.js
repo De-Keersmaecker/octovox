@@ -196,6 +196,54 @@ app.post('/api/admin/migrate-3-phase', async (req, res) => {
   }
 });
 
+// Dev debug endpoint for testing assignment
+app.post('/api/dev/debug-assignment', async (req, res) => {
+  try {
+    const { email, classCode, listId } = req.body;
+
+    if (email !== 'jelledekeersmaecker@gmail.com') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    console.log('Debug assignment:', { classCode, listId });
+
+    // Check tables exist
+    const tables = await db.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      AND table_name IN ('word_lists', 'classes', 'class_word_lists')
+    `);
+    console.log('Tables found:', tables.rows);
+
+    // Check word list
+    const wordList = await db.query('SELECT * FROM word_lists WHERE id = $1', [listId]);
+    console.log('Word list found:', wordList.rows);
+
+    // Check class
+    const classData = await db.query('SELECT * FROM classes WHERE code = $1', [classCode]);
+    console.log('Class found:', classData.rows);
+
+    // Check existing assignments
+    const existing = await db.query('SELECT * FROM class_word_lists WHERE class_code = $1 AND list_id = $2', [classCode, listId]);
+    console.log('Existing assignment:', existing.rows);
+
+    res.json({
+      success: true,
+      debug: {
+        tables: tables.rows,
+        wordList: wordList.rows,
+        classData: classData.rows,
+        existing: existing.rows
+      }
+    });
+
+  } catch (error) {
+    console.error('Debug assignment error:', error);
+    res.status(500).json({ error: 'Debug failed', details: error.message });
+  }
+});
+
 // Dev run migrations endpoint
 app.post('/api/dev/run-migrations', async (req, res) => {
   try {

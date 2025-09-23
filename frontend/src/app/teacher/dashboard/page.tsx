@@ -239,12 +239,12 @@ export default function TeacherDashboard() {
             <div className="text-xs opacity-75 mt-1">Bekijk welke woorden moeilijk zijn</div>
           </button>
           <button
-            onClick={() => router.push('/admin/dashboard')}
+            onClick={() => router.push('/teacher/word-lists')}
             className="retro-border p-6 hover:bg-white hover:text-black transition-colors"
           >
             <BookOpen size={24} className="mx-auto mb-2" />
             <div className="font-mono font-bold">WOORDENLIJSTEN</div>
-            <div className="text-xs opacity-75 mt-1">Beheer woorden en lijsten</div>
+            <div className="text-xs opacity-75 mt-1">Bekijk en beheer woordenlijsten</div>
           </button>
           <button
             onClick={() => router.push('/teacher/classes')}

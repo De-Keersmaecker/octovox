@@ -230,6 +230,31 @@ app.post('/api/dev/run-migrations', async (req, res) => {
       END $$
     `);
 
+    // Create classes table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS classes (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        teacher_id VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create class_word_lists table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS class_word_lists (
+        id SERIAL PRIMARY KEY,
+        class_code VARCHAR(50) NOT NULL,
+        list_id INTEGER NOT NULL,
+        assigned_by VARCHAR(255),
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+        UNIQUE(class_code, list_id)
+      )
+    `);
+
     console.log('Migrations completed successfully!');
 
     res.json({

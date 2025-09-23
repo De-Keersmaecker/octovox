@@ -256,6 +256,15 @@ app.post('/api/dev/run-migrations', async (req, res) => {
 
     console.log('Running database migrations...');
 
+    // Check word_lists table id column type
+    const wordListsIdType = await db.query(`
+      SELECT data_type
+      FROM information_schema.columns
+      WHERE table_name = 'word_lists' AND column_name = 'id'
+    `);
+
+    console.log('Word lists id column type:', wordListsIdType.rows);
+
     // Add class_code column to users table if it doesn't exist
     await db.query(`
       DO $$
@@ -293,17 +302,21 @@ app.post('/api/dev/run-migrations', async (req, res) => {
 
     // Drop and recreate class_word_lists table to ensure correct schema
     await db.query(`DROP TABLE IF EXISTS class_word_lists CASCADE`);
+
+    // Create with UUID support for list_id to match word_lists.id
     await db.query(`
       CREATE TABLE class_word_lists (
         id SERIAL PRIMARY KEY,
         class_code VARCHAR(50) NOT NULL,
-        list_id VARCHAR(255) NOT NULL,
+        list_id UUID NOT NULL,
         assigned_by VARCHAR(255),
         assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_active BOOLEAN DEFAULT true,
         UNIQUE(class_code, list_id)
       )
     `);
+
+    console.log('Created class_word_lists table with UUID list_id column');
 
     // Insert test classes if they don't exist
     await db.query(`

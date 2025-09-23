@@ -389,6 +389,26 @@ app.post('/api/dev/run-migrations', async (req, res) => {
 
     console.log('Created class_word_lists table with UUID list_id column');
 
+    // Create reward_settings table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS reward_settings (
+        id SERIAL PRIMARY KEY,
+        setting_key VARCHAR(100) UNIQUE NOT NULL,
+        setting_value TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Insert default reward settings if they don't exist
+    await db.query(`
+      INSERT INTO reward_settings (setting_key, setting_value)
+      VALUES
+        ('perfect_score_video_url', 'https://www.youtube.com/embed/dQw4w9WgXcQ'),
+        ('perfect_score_message', 'Geweldig! Je hebt alles in één keer goed! 🎉')
+      ON CONFLICT (setting_key) DO NOTHING
+    `);
+
     // Insert test classes if they don't exist
     await db.query(`
       INSERT INTO classes (code, name, teacher_id)
@@ -1381,6 +1401,55 @@ const requireAdmin = (req, res, next) => {
   }
   return res.status(403).json({ error: 'Administrator access required' });
 };
+
+// Reward Settings routes
+
+// Get reward settings
+app.get('/api/reward-settings', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query('SELECT * FROM reward_settings');
+    const settings = {};
+    result.rows.forEach(row => {
+      settings[row.setting_key] = row.setting_value;
+    });
+    res.json(settings);
+  } catch (error) {
+    console.error('Get reward settings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Update reward settings (admin only)
+app.put('/api/admin/reward-settings', authenticateToken, requireRole('administrator'), async (req, res) => {
+  try {
+    const { perfect_score_video_url, perfect_score_message } = req.body;
+
+    if (perfect_score_video_url !== undefined) {
+      await db.query(
+        `INSERT INTO reward_settings (setting_key, setting_value)
+         VALUES ('perfect_score_video_url', $1)
+         ON CONFLICT (setting_key)
+         DO UPDATE SET setting_value = $1, updated_at = CURRENT_TIMESTAMP`,
+        [perfect_score_video_url]
+      );
+    }
+
+    if (perfect_score_message !== undefined) {
+      await db.query(
+        `INSERT INTO reward_settings (setting_key, setting_value)
+         VALUES ('perfect_score_message', $1)
+         ON CONFLICT (setting_key)
+         DO UPDATE SET setting_value = $1, updated_at = CURRENT_TIMESTAMP`,
+        [perfect_score_message]
+      );
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Update reward settings error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Teacher routes
 

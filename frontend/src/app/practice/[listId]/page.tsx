@@ -57,10 +57,29 @@ export default function Practice() {
   const [answersDisabled, setAnswersDisabled] = useState(false)
   const [isFirstRound, setIsFirstRound] = useState(true)
   const [roundWordIndex, setRoundWordIndex] = useState(0)
+  const [showPerfectScoreReward, setShowPerfectScoreReward] = useState(false)
+  const [rewardSettings, setRewardSettings] = useState<any>(null)
 
   useEffect(() => {
     initializeSession()
+    fetchRewardSettings()
   }, [listId])
+
+  const fetchRewardSettings = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/reward-settings`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+      if (response.ok) {
+        const settings = await response.json()
+        setRewardSettings(settings)
+      }
+    } catch (error) {
+      console.error('Failed to fetch reward settings:', error)
+    }
+  }
 
   useEffect(() => {
     if (words.length > 0 && currentWordIndex >= 0) {
@@ -258,8 +277,12 @@ export default function Practice() {
         })
 
         if (orangeWords.length === 0) {
-          // All green in first round! Check if we should go to next phase
-          checkPhaseProgression()
+          // All green in first round! Check for perfect score in phase 3
+          if (session?.current_phase === 3) {
+            checkForPerfectScore()
+          } else {
+            checkPhaseProgression()
+          }
         } else {
           // Start repeating orange words
           setWordQueue(orangeWords)
@@ -291,6 +314,23 @@ export default function Practice() {
         setWordQueue(newQueue)
       }
     }
+  }
+
+  const checkForPerfectScore = () => {
+    // Check if all words are green in first round of phase 3
+    const allGreen = words.every(word => wordStatuses[word.id] === 'green')
+
+    if (allGreen && isFirstRound && session?.current_phase === 3) {
+      console.log('🎉 Perfect score detected! All words correct in first try!')
+      setShowPerfectScoreReward(true)
+
+      // Don't proceed to next battery/phase automatically
+      // Let the user enjoy the reward and click continue
+      return
+    }
+
+    // If not perfect score, proceed normally
+    checkPhaseProgression()
   }
 
   const checkPhaseProgression = async () => {
@@ -690,6 +730,52 @@ export default function Practice() {
           )}
         </div>
       </div>
+
+      {/* Perfect Score Reward Modal */}
+      {showPerfectScoreReward && rewardSettings && (
+        <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
+          <div className="retro-border p-8 bg-black max-w-2xl w-full mx-4 text-center">
+            <div className="text-4xl mb-6">🎉</div>
+            <h2 className="text-3xl font-bold mb-4 text-yellow-400">PERFECT SCORE!</h2>
+            <p className="text-xl mb-6">
+              {rewardSettings.perfect_score_message || 'Geweldig! Je hebt alles in één keer goed!'}
+            </p>
+
+            {rewardSettings.perfect_score_video_url && (
+              <div className="mb-6">
+                <iframe
+                  width="480"
+                  height="270"
+                  src={rewardSettings.perfect_score_video_url}
+                  title="Beloning video"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="mx-auto retro-border"
+                ></iframe>
+              </div>
+            )}
+
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => {
+                  setShowPerfectScoreReward(false)
+                  checkPhaseProgression()
+                }}
+                className="retro-button bg-green-600 hover:bg-green-700 text-xl px-8 py-4"
+              >
+                VERDER GAAN
+              </button>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="retro-button-secondary text-xl px-8 py-4"
+              >
+                TERUG NAAR DASHBOARD
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

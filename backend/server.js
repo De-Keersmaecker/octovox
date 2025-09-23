@@ -255,6 +255,15 @@ app.post('/api/dev/run-migrations', async (req, res) => {
       )
     `);
 
+    // Insert test classes if they don't exist
+    await db.query(`
+      INSERT INTO classes (code, name, teacher_id)
+      VALUES
+        ('CLASS2024', 'Klas 2024', 'fd0fded7-20b3-4481-9902-469c6932552a'),
+        ('CLASS2025', 'Klas 2025', 'fd0fded7-20b3-4481-9902-469c6932552a')
+      ON CONFLICT (code) DO NOTHING
+    `);
+
     console.log('Migrations completed successfully!');
 
     res.json({

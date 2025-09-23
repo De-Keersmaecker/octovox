@@ -65,7 +65,7 @@ export default function DevRoleSwitcher() {
       }
     } catch (error) {
       console.error('Error switching role:', error)
-      alert(`Error switching role: ${error.message || 'Unknown error'}`)
+      alert(`Error switching role: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 

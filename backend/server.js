@@ -792,7 +792,6 @@ app.get('/api/learning/word-lists', authenticateToken, requireRole('student'), a
       LEFT JOIN words w ON wl.id = w.list_id
       WHERE cwl.class_code = $1 AND cwl.is_active = true
       GROUP BY wl.id, wl.title, wl.theme, wl.created_at
-      HAVING COUNT(CASE WHEN w.is_active = true THEN 1 END) > 0
       ORDER BY wl.created_at DESC`,
       [classCode]
     );

@@ -196,6 +196,77 @@ app.post('/api/admin/migrate-3-phase', async (req, res) => {
   }
 });
 
+// Dev debug endpoint for student word lists
+app.get('/api/dev/debug-student-lists/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log('Debug: Getting word lists for student:', userId);
+
+    // Get student's class
+    const userResult = await db.query(
+      'SELECT * FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const user = userResult.rows[0];
+    const classCode = user.class_code;
+
+    console.log('Debug: Student data:', user);
+    console.log('Debug: Student class code:', classCode);
+
+    // Get assignments for this class
+    const assignments = await db.query(
+      'SELECT * FROM class_word_lists WHERE class_code = $1 AND is_active = true',
+      [classCode]
+    );
+
+    console.log('Debug: Assignments for class:', assignments.rows);
+
+    // Try the join query
+    let wordLists = [];
+    let queryError = null;
+
+    try {
+      const result = await db.query(
+        `SELECT
+          wl.id,
+          wl.title,
+          wl.theme,
+          COUNT(w.id) as total_words,
+          COUNT(CASE WHEN w.is_active = true THEN 1 END) as active_words
+        FROM word_lists wl
+        INNER JOIN class_word_lists cwl ON wl.id::text = cwl.list_id::text
+        LEFT JOIN words w ON wl.id = w.list_id
+        WHERE cwl.class_code = $1 AND cwl.is_active = true
+        GROUP BY wl.id, wl.title, wl.theme, wl.created_at
+        ORDER BY wl.created_at DESC`,
+        [classCode]
+      );
+      wordLists = result.rows;
+    } catch (error) {
+      queryError = error.message;
+      console.error('Debug: Query error:', error);
+    }
+
+    res.json({
+      user,
+      classCode,
+      assignments: assignments.rows,
+      wordLists,
+      queryError
+    });
+
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: 'Debug failed', details: error.message });
+  }
+});
+
 // Dev debug endpoint for testing assignment
 app.post('/api/dev/debug-assignment', async (req, res) => {
   try {

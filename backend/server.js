@@ -192,6 +192,94 @@ app.post('/api/admin/migrate-3-phase', async (req, res) => {
   }
 });
 
+// Dev run migrations endpoint
+app.post('/api/dev/run-migrations', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Only allow specific email
+    if (email !== 'jelledekeersmaecker@gmail.com') {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    console.log('Running database migrations...');
+
+    // Add class_code column to users table if it doesn't exist
+    await db.query(`
+      DO $$
+      BEGIN
+          IF NOT EXISTS (
+              SELECT 1
+              FROM information_schema.columns
+              WHERE table_name = 'users'
+              AND column_name = 'class_code'
+          ) THEN
+              ALTER TABLE users ADD COLUMN class_code VARCHAR(50);
+
+              -- Add index for faster queries
+              CREATE INDEX IF NOT EXISTS idx_users_class_code ON users(class_code);
+
+              RAISE NOTICE 'Added class_code column to users table';
+          ELSE
+              RAISE NOTICE 'class_code column already exists in users table';
+          END IF;
+      END $$
+    `);
+
+    // Create classes table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS classes (
+        id SERIAL PRIMARY KEY,
+        code VARCHAR(50) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        teacher_id INTEGER REFERENCES users(id),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create class_word_lists table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS class_word_lists (
+        id SERIAL PRIMARY KEY,
+        class_code VARCHAR(50) NOT NULL,
+        list_id INTEGER NOT NULL REFERENCES word_lists(id) ON DELETE CASCADE,
+        assigned_by INTEGER REFERENCES users(id),
+        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_active BOOLEAN DEFAULT true,
+        UNIQUE(class_code, list_id)
+      )
+    `);
+
+    // Create word_statistics table if it doesn't exist
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS word_statistics (
+        id SERIAL PRIMARY KEY,
+        word_id INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
+        class_code VARCHAR(50),
+        total_attempts INTEGER DEFAULT 0,
+        correct_attempts INTEGER DEFAULT 0,
+        accuracy_rate DECIMAL(5,2) DEFAULT 0,
+        last_calculated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(word_id, class_code)
+      )
+    `);
+
+    console.log('Migrations completed successfully!');
+
+    res.json({
+      success: true,
+      message: 'Database migrations completed successfully!'
+    });
+
+  } catch (error) {
+    console.error('Migration error:', error);
+    res.status(500).json({ error: 'Migration failed', details: error.message });
+  }
+});
+
 // Dev setup test data endpoint
 app.post('/api/dev/setup-test-data', async (req, res) => {
   try {

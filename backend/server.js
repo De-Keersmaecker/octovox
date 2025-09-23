@@ -99,6 +99,10 @@ const requireRole = (role) => {
     if (!req.user) {
       return res.status(401).json({ error: 'Authentication required' });
     }
+    // Administrator has access to all roles
+    if (req.user.role === 'administrator') {
+      return next();
+    }
     if (req.user.role !== role) {
       return res.status(403).json({ error: `${role} access required` });
     }
@@ -1209,7 +1213,7 @@ const requireAdmin = (req, res, next) => {
 // Teacher routes
 
 // Get classes and their assigned word lists
-app.get('/api/teacher/classes', authenticateToken, async (req, res) => {
+app.get('/api/teacher/classes', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const classes = await db.query(
       `SELECT
@@ -1232,7 +1236,7 @@ app.get('/api/teacher/classes', authenticateToken, async (req, res) => {
 });
 
 // Get assigned word lists for a specific class
-app.get('/api/teacher/classes/:classCode/word-lists', authenticateToken, async (req, res) => {
+app.get('/api/teacher/classes/:classCode/word-lists', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const { classCode } = req.params;
 
@@ -1261,7 +1265,7 @@ app.get('/api/teacher/classes/:classCode/word-lists', authenticateToken, async (
 });
 
 // Assign/unassign word list to class
-app.post('/api/teacher/classes/:classCode/assign-list', authenticateToken, async (req, res) => {
+app.post('/api/teacher/classes/:classCode/assign-list', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const { classCode } = req.params;
     const { listId, assign } = req.body;
@@ -1292,7 +1296,7 @@ app.post('/api/teacher/classes/:classCode/assign-list', authenticateToken, async
 });
 
 // Get student results for a class
-app.get('/api/teacher/classes/:classCode/results', authenticateToken, async (req, res) => {
+app.get('/api/teacher/classes/:classCode/results', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const { classCode } = req.params;
 
@@ -1329,7 +1333,7 @@ app.get('/api/teacher/classes/:classCode/results', authenticateToken, async (req
 });
 
 // Get word lists for teachers
-app.get('/api/teacher/word-lists', authenticateToken, async (req, res) => {
+app.get('/api/teacher/word-lists', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const wordLists = await db.query(
       `SELECT
@@ -1351,7 +1355,7 @@ app.get('/api/teacher/word-lists', authenticateToken, async (req, res) => {
 });
 
 // Get word difficulty statistics
-app.get('/api/teacher/word-difficulty', authenticateToken, async (req, res) => {
+app.get('/api/teacher/word-difficulty', authenticateToken, requireRole('teacher'), async (req, res) => {
   try {
     const { scope, classCode, listId } = req.query;
     const userRole = req.user.role;

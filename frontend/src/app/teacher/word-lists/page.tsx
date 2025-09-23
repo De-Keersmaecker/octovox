@@ -65,15 +65,22 @@ export default function TeacherWordLists() {
 
   const fetchClasses = async () => {
     try {
+      console.log('Fetching classes...')
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teacher/classes`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         }
       })
 
+      console.log('Classes response status:', response.status)
+
       if (response.ok) {
         const data = await response.json()
+        console.log('Classes data:', data)
         setClasses(data.classes || [])
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Failed to fetch classes:', response.status, errorData)
       }
     } catch (error) {
       console.error('Failed to fetch classes:', error)
@@ -96,6 +103,12 @@ export default function TeacherWordLists() {
     setAssignLoading(classCode)
 
     try {
+      console.log('Assigning word list:', {
+        classCode,
+        listId: selectedWordList.id,
+        listTitle: selectedWordList.title
+      })
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/teacher/classes/${classCode}/assign-list`,
         {
@@ -111,16 +124,22 @@ export default function TeacherWordLists() {
         }
       )
 
+      console.log('Assignment response status:', response.status)
+
       if (response.ok) {
+        const data = await response.json()
+        console.log('Assignment response data:', data)
         alert(`Woordenlijst "${selectedWordList.title}" is toegewezen aan ${classCode}!`)
         closeAssignModal()
         fetchClasses() // Refresh class data
       } else {
-        alert('Er ging iets mis bij het toewijzen van de woordenlijst.')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('Assignment failed:', response.status, errorData)
+        alert(`Er ging iets mis bij het toewijzen: ${errorData.error || 'Onbekende fout'}`)
       }
     } catch (error) {
       console.error('Failed to assign word list:', error)
-      alert('Er ging iets mis bij het toewijzen van de woordenlijst.')
+      alert(`Er ging iets mis bij het toewijzen van de woordenlijst: ${error instanceof Error ? error.message : 'Onbekende fout'}`)
     } finally {
       setAssignLoading(null)
     }
@@ -242,26 +261,33 @@ export default function TeacherWordLists() {
               </p>
 
               <div className="space-y-3 mb-6">
-                {classes.map((cls) => (
-                  <button
-                    key={cls.code}
-                    onClick={() => assignToClass(cls.code)}
-                    disabled={assignLoading === cls.code}
-                    className="w-full retro-border p-4 hover:bg-white hover:text-black transition-colors text-left disabled:opacity-50"
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <div className="font-bold">{cls.name}</div>
-                        <div className="text-sm opacity-75">
-                          {cls.student_count} leerlingen • {cls.assigned_lists} lijsten toegewezen
+                {classes.length === 0 ? (
+                  <div className="text-center py-4 opacity-75">
+                    <p>Geen klassen gevonden.</p>
+                    <p className="text-sm mt-2">Controleer of er klassen zijn aangemaakt.</p>
+                  </div>
+                ) : (
+                  classes.map((cls) => (
+                    <button
+                      key={cls.code}
+                      onClick={() => assignToClass(cls.code)}
+                      disabled={assignLoading === cls.code}
+                      className="w-full retro-border p-4 hover:bg-white hover:text-black transition-colors text-left disabled:opacity-50"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="font-bold">{cls.name}</div>
+                          <div className="text-sm opacity-75">
+                            {cls.student_count} leerlingen • {cls.assigned_lists} lijsten toegewezen
+                          </div>
                         </div>
+                        {assignLoading === cls.code && (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        )}
                       </div>
-                      {assignLoading === cls.code && (
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      )}
-                    </div>
-                  </button>
-                ))}
+                    </button>
+                  ))
+                )}
               </div>
 
               <div className="flex gap-2">

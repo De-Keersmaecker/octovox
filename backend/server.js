@@ -226,47 +226,6 @@ app.post('/api/dev/run-migrations', async (req, res) => {
       END $$
     `);
 
-    // Create classes table if it doesn't exist
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS classes (
-        id SERIAL PRIMARY KEY,
-        code VARCHAR(50) UNIQUE NOT NULL,
-        name VARCHAR(255) NOT NULL,
-        teacher_id INTEGER REFERENCES users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
-
-    // Create class_word_lists table if it doesn't exist
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS class_word_lists (
-        id SERIAL PRIMARY KEY,
-        class_code VARCHAR(50) NOT NULL,
-        list_id INTEGER NOT NULL REFERENCES word_lists(id) ON DELETE CASCADE,
-        assigned_by INTEGER REFERENCES users(id),
-        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        is_active BOOLEAN DEFAULT true,
-        UNIQUE(class_code, list_id)
-      )
-    `);
-
-    // Create word_statistics table if it doesn't exist
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS word_statistics (
-        id SERIAL PRIMARY KEY,
-        word_id INTEGER NOT NULL REFERENCES words(id) ON DELETE CASCADE,
-        class_code VARCHAR(50),
-        total_attempts INTEGER DEFAULT 0,
-        correct_attempts INTEGER DEFAULT 0,
-        accuracy_rate DECIMAL(5,2) DEFAULT 0,
-        last_calculated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(word_id, class_code)
-      )
-    `);
-
     console.log('Migrations completed successfully!');
 
     res.json({

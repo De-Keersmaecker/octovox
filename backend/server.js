@@ -249,7 +249,7 @@ app.post('/api/dev/run-migrations', async (req, res) => {
       CREATE TABLE class_word_lists (
         id SERIAL PRIMARY KEY,
         class_code VARCHAR(50) NOT NULL,
-        list_id INTEGER NOT NULL,
+        list_id VARCHAR(255) NOT NULL,
         assigned_by VARCHAR(255),
         assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         is_active BOOLEAN DEFAULT true,
@@ -1307,6 +1307,22 @@ app.post('/api/teacher/classes/:classCode/assign-list', authenticateToken, requi
     const { listId, assign } = req.body;
     const teacherId = req.user.userId;
 
+    console.log('Assign list request:', { classCode, listId, assign, teacherId });
+
+    // First check if the word list exists
+    const listCheck = await db.query('SELECT id FROM word_lists WHERE id = $1', [listId]);
+    if (listCheck.rows.length === 0) {
+      console.error('Word list not found:', listId);
+      return res.status(404).json({ error: 'Word list not found' });
+    }
+
+    // Check if class exists
+    const classCheck = await db.query('SELECT code FROM classes WHERE code = $1', [classCode]);
+    if (classCheck.rows.length === 0) {
+      console.error('Class not found:', classCode);
+      return res.status(404).json({ error: 'Class not found' });
+    }
+
     if (assign) {
       // Assign list to class
       await db.query(
@@ -1316,18 +1332,20 @@ app.post('/api/teacher/classes/:classCode/assign-list', authenticateToken, requi
          DO UPDATE SET is_active = true, assigned_by = $3, assigned_at = CURRENT_TIMESTAMP`,
         [classCode, listId, teacherId]
       );
+      console.log('Successfully assigned list to class:', { classCode, listId });
     } else {
       // Unassign list from class
       await db.query(
         'UPDATE class_word_lists SET is_active = false WHERE class_code = $1 AND list_id = $2',
         [classCode, listId]
       );
+      console.log('Successfully unassigned list from class:', { classCode, listId });
     }
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Assign list error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Assign list error:', error.message, error.stack);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 });
 

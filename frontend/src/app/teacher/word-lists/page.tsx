@@ -11,9 +11,20 @@ interface WordList {
   total_words: number
 }
 
+interface Class {
+  code: string
+  name: string
+  student_count: number
+  assigned_lists: number
+}
+
 export default function TeacherWordLists() {
   const [wordLists, setWordLists] = useState<WordList[]>([])
+  const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
+  const [showAssignModal, setShowAssignModal] = useState(false)
+  const [selectedWordList, setSelectedWordList] = useState<WordList | null>(null)
+  const [assignLoading, setAssignLoading] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -30,6 +41,7 @@ export default function TeacherWordLists() {
     }
 
     fetchWordLists()
+    fetchClasses()
   }, [router])
 
   const fetchWordLists = async () => {
@@ -48,6 +60,69 @@ export default function TeacherWordLists() {
       console.error('Failed to fetch word lists:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchClasses = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teacher/classes`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setClasses(data.classes || [])
+      }
+    } catch (error) {
+      console.error('Failed to fetch classes:', error)
+    }
+  }
+
+  const openAssignModal = (wordList: WordList) => {
+    setSelectedWordList(wordList)
+    setShowAssignModal(true)
+  }
+
+  const closeAssignModal = () => {
+    setSelectedWordList(null)
+    setShowAssignModal(false)
+  }
+
+  const assignToClass = async (classCode: string) => {
+    if (!selectedWordList) return
+
+    setAssignLoading(classCode)
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/teacher/classes/${classCode}/assign-list`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`
+          },
+          body: JSON.stringify({
+            listId: selectedWordList.id,
+            assign: true
+          })
+        }
+      )
+
+      if (response.ok) {
+        alert(`Woordenlijst "${selectedWordList.title}" is toegewezen aan ${classCode}!`)
+        closeAssignModal()
+        fetchClasses() // Refresh class data
+      } else {
+        alert('Er ging iets mis bij het toewijzen van de woordenlijst.')
+      }
+    } catch (error) {
+      console.error('Failed to assign word list:', error)
+      alert('Er ging iets mis bij het toewijzen van de woordenlijst.')
+    } finally {
+      setAssignLoading(null)
     }
   }
 
@@ -121,7 +196,7 @@ export default function TeacherWordLists() {
                         BEKIJK
                       </button>
                       <button
-                        onClick={() => router.push('/teacher/classes')}
+                        onClick={() => openAssignModal(list)}
                         className="retro-button bg-green-600 hover:bg-green-700 flex items-center gap-2"
                       >
                         <Users size={16} />
@@ -156,6 +231,50 @@ export default function TeacherWordLists() {
             </button>
           </div>
         </div>
+
+        {/* Assignment Modal */}
+        {showAssignModal && selectedWordList && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="retro-border p-6 bg-black max-w-md w-full mx-4">
+              <h3 className="text-xl font-bold mb-4">Woordenlijst toewijzen</h3>
+              <p className="mb-4">
+                Wijs <strong>"{selectedWordList.title}"</strong> toe aan een klas:
+              </p>
+
+              <div className="space-y-3 mb-6">
+                {classes.map((cls) => (
+                  <button
+                    key={cls.code}
+                    onClick={() => assignToClass(cls.code)}
+                    disabled={assignLoading === cls.code}
+                    className="w-full retro-border p-4 hover:bg-white hover:text-black transition-colors text-left disabled:opacity-50"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="font-bold">{cls.name}</div>
+                        <div className="text-sm opacity-75">
+                          {cls.student_count} leerlingen • {cls.assigned_lists} lijsten toegewezen
+                        </div>
+                      </div>
+                      {assignLoading === cls.code && (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={closeAssignModal}
+                  className="retro-button-secondary flex-1"
+                >
+                  ANNULEREN
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

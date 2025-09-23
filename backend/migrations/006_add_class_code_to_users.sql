@@ -12,13 +12,6 @@ BEGIN
         -- Add index for faster queries
         CREATE INDEX idx_users_class_code ON users(class_code);
 
-        -- Add foreign key constraint to classes table
-        ALTER TABLE users
-        ADD CONSTRAINT fk_users_class_code
-        FOREIGN KEY (class_code)
-        REFERENCES classes(code)
-        ON DELETE SET NULL;
-
         RAISE NOTICE 'Added class_code column to users table';
     ELSE
         RAISE NOTICE 'class_code column already exists in users table';

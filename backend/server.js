@@ -1427,7 +1427,7 @@ app.get('/api/reward-settings', authenticateToken, async (req, res) => {
 });
 
 // Update reward settings (admin only)
-app.put('/api/admin/reward-settings', authenticateToken, requireRole('administrator'), async (req, res) => {
+app.put('/api/admin/reward-settings', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { perfect_score_video_url, perfect_score_message } = req.body;
 

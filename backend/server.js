@@ -1436,7 +1436,7 @@ app.put('/api/admin/reward-settings', authenticateToken, requireRole('administra
         `INSERT INTO reward_settings (setting_key, setting_value)
          VALUES ('perfect_score_video_url', $1)
          ON CONFLICT (setting_key)
-         DO UPDATE SET setting_value = $1, updated_at = CURRENT_TIMESTAMP`,
+         DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP`,
         [perfect_score_video_url]
       );
     }
@@ -1446,7 +1446,7 @@ app.put('/api/admin/reward-settings', authenticateToken, requireRole('administra
         `INSERT INTO reward_settings (setting_key, setting_value)
          VALUES ('perfect_score_message', $1)
          ON CONFLICT (setting_key)
-         DO UPDATE SET setting_value = $1, updated_at = CURRENT_TIMESTAMP`,
+         DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP`,
         [perfect_score_message]
       );
     }

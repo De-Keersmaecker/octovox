@@ -1573,20 +1573,23 @@ app.get('/api/teacher/classes/:classCode/results', authenticateToken, requireRol
         u.email as student_email,
         wl.title as list_title,
         wl.id as list_id,
-        COUNT(pa.id) as total_attempts,
-        SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END) as correct_attempts,
+        COUNT(wa.id) as total_attempts,
+        SUM(CASE WHEN wa.is_correct THEN 1 ELSE 0 END) as correct_attempts,
         CASE
-          WHEN COUNT(pa.id) > 0
-          THEN ROUND((SUM(CASE WHEN pa.is_correct THEN 1 ELSE 0 END)::DECIMAL / COUNT(pa.id)::DECIMAL * 100), 1)
+          WHEN COUNT(wa.id) > 0
+          THEN ROUND((SUM(CASE WHEN wa.is_correct THEN 1 ELSE 0 END)::DECIMAL / COUNT(wa.id)::DECIMAL * 100), 1)
           ELSE 0
         END as accuracy_rate,
-        MAX(pa.attempted_at) as last_attempt
+        MAX(wa.created_at) as last_attempt,
+        MAX(ls.current_phase) as current_phase,
+        MAX(ls.session_state) as session_state
       FROM users u
-      LEFT JOIN practice_attempts pa ON u.id = pa.user_id
-      LEFT JOIN words w ON pa.word_id = w.id
-      LEFT JOIN word_lists wl ON w.list_id = wl.id
+      LEFT JOIN learning_sessions ls ON u.id = ls.user_id
+      LEFT JOIN word_lists wl ON ls.list_id = wl.id
+      LEFT JOIN word_attempts wa ON ls.id = wa.session_id
       WHERE u.class_code = $1 AND u.role = 'student'
       GROUP BY u.id, u.name, u.email, wl.id, wl.title
+      HAVING COUNT(wa.id) > 0 OR COUNT(ls.id) > 0
       ORDER BY u.name, wl.title`,
       [classCode]
     );

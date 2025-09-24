@@ -1433,20 +1433,20 @@ app.put('/api/admin/reward-settings', authenticateToken, requireRole('administra
 
     if (perfect_score_video_url !== undefined) {
       await db.query(
-        `INSERT INTO reward_settings (setting_key, setting_value, updated_at)
-         VALUES ('perfect_score_video_url', $1, NOW())
+        `INSERT INTO reward_settings (setting_key, setting_value)
+         VALUES ('perfect_score_video_url', $1)
          ON CONFLICT (setting_key)
-         DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = NOW()`,
+         DO UPDATE SET setting_value = EXCLUDED.setting_value`,
         [perfect_score_video_url]
       );
     }
 
     if (perfect_score_message !== undefined) {
       await db.query(
-        `INSERT INTO reward_settings (setting_key, setting_value, updated_at)
-         VALUES ('perfect_score_message', $1, NOW())
+        `INSERT INTO reward_settings (setting_key, setting_value)
+         VALUES ('perfect_score_message', $1)
          ON CONFLICT (setting_key)
-         DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = NOW()`,
+         DO UPDATE SET setting_value = EXCLUDED.setting_value`,
         [perfect_score_message]
       );
     }

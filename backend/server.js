@@ -443,6 +443,13 @@ app.post('/api/dev/setup-test-data', async (req, res) => {
 
     console.log('Setting up test data...');
 
+    // 0. Update users table schema if needed
+    await db.query(`
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS class_code VARCHAR(50);
+      ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+      ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('student', 'teacher', 'administrator'));
+    `);
+
     // 1. Create test classes
     await db.query(`
       INSERT INTO classes (code, name, teacher_id, created_at)
@@ -456,20 +463,20 @@ app.post('/api/dev/setup-test-data', async (req, res) => {
     const hashedPassword = '$2a$10$X4kv7j5ZcQbLF5LlYx0Oc.GJdgyLWg6h7AUaAXhh7NVmRsDZ3F9bW';
 
     await db.query(`
-      INSERT INTO users (email, name, password, role, class_code)
+      INSERT INTO users (email, name, password_hash, role, class_code, is_verified)
       VALUES
-        ('anna@test.com', 'Anna Janssens', $1, 'student', 'CLASS2024'),
-        ('pieter@test.com', 'Pieter De Vries', $1, 'student', 'CLASS2024'),
-        ('emma@test.com', 'Emma Peeters', $1, 'student', 'CLASS2025'),
-        ('lucas@test.com', 'Lucas Van Damme', $1, 'student', 'CLASS2025'),
-        ('sophie@test.com', 'Sophie Willems', $1, 'student', 'CLASS2024')
+        ('anna@test.com', 'Anna Janssens', $1, 'student', 'CLASS2024', true),
+        ('pieter@test.com', 'Pieter De Vries', $1, 'student', 'CLASS2024', true),
+        ('emma@test.com', 'Emma Peeters', $1, 'student', 'CLASS2025', true),
+        ('lucas@test.com', 'Lucas Van Damme', $1, 'student', 'CLASS2025', true),
+        ('sophie@test.com', 'Sophie Willems', $1, 'student', 'CLASS2024', true)
       ON CONFLICT (email) DO UPDATE SET class_code = EXCLUDED.class_code
     `, [hashedPassword]);
 
     // 3. Create test teacher
     await db.query(`
-      INSERT INTO users (email, name, password, role)
-      VALUES ('teacher@test.com', 'Mevr. De Boeck', $1, 'teacher')
+      INSERT INTO users (email, name, password_hash, role, is_verified)
+      VALUES ('teacher@test.com', 'Mevr. De Boeck', $1, 'teacher', true)
       ON CONFLICT (email) DO UPDATE SET role = EXCLUDED.role
     `, [hashedPassword]);
 

@@ -1434,41 +1434,17 @@ app.put('/api/admin/reward-settings', authenticateToken, requireAdmin, async (re
     console.log('Updating reward settings:', { perfect_score_video_url, perfect_score_message });
 
     if (perfect_score_video_url !== undefined) {
-      const result = await db.query(
-        `UPDATE reward_settings
-         SET setting_value = $1
-         WHERE setting_key = 'perfect_score_video_url'
-         RETURNING *`,
+      await db.query(
+        `UPDATE reward_settings SET setting_value = $1 WHERE setting_key = 'perfect_score_video_url'`,
         [perfect_score_video_url]
       );
-
-      if (result.rows.length === 0) {
-        // Insert if not exists
-        await db.query(
-          `INSERT INTO reward_settings (setting_key, setting_value)
-           VALUES ('perfect_score_video_url', $1)`,
-          [perfect_score_video_url]
-        );
-      }
     }
 
     if (perfect_score_message !== undefined) {
-      const result = await db.query(
-        `UPDATE reward_settings
-         SET setting_value = $1
-         WHERE setting_key = 'perfect_score_message'
-         RETURNING *`,
+      await db.query(
+        `UPDATE reward_settings SET setting_value = $1 WHERE setting_key = 'perfect_score_message'`,
         [perfect_score_message]
       );
-
-      if (result.rows.length === 0) {
-        // Insert if not exists
-        await db.query(
-          `INSERT INTO reward_settings (setting_key, setting_value)
-           VALUES ('perfect_score_message', $1)`,
-          [perfect_score_message]
-        );
-      }
     }
 
     res.json({ success: true, message: 'Settings updated successfully' });

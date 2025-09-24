@@ -73,7 +73,9 @@ export default function RewardSettings() {
       if (response.ok) {
         alert('Instellingen succesvol opgeslagen!')
       } else {
-        alert('Er ging iets mis bij het opslaan.')
+        const errorText = await response.text()
+        console.error('Save error response:', errorText)
+        alert('Er ging iets mis bij het opslaan. Neem contact op met de ontwikkelaar.')
       }
     } catch (error) {
       console.error('Failed to save settings:', error)

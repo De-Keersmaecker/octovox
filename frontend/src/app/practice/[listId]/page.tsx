@@ -298,7 +298,6 @@ export default function Practice() {
         setCurrentWordIndex(prev => prev + 1)
       } else {
         // First round complete, build queue of orange words
-        setIsFirstRound(false)
         const orangeWords: string[] = []
         words.forEach(w => {
           if (wordStatuses[w.id] === 'orange') {
@@ -308,17 +307,22 @@ export default function Practice() {
 
         if (orangeWords.length === 0) {
           // All green in first round! Check for perfect score in phase 3
-          if (session?.current_phase === 3) {
+          if (session?.current_phase === 3 && isFirstRound) {
+            // Check BEFORE setting isFirstRound to false
             const isPerfectScore = checkForPerfectScore()
-            // If not perfect score (modal not shown), proceed normally
-            if (!isPerfectScore) {
-              checkPhaseProgression()
+            if (isPerfectScore) {
+              // Perfect score! Modal will be shown, don't continue
+              setIsFirstRound(false)  // Still need to mark round as complete
+              return  // Stop here, modal will handle next steps
             }
-          } else {
-            checkPhaseProgression()
           }
+
+          // Not a perfect score, proceed normally
+          setIsFirstRound(false)
+          checkPhaseProgression()
         } else {
           // Start repeating orange words
+          setIsFirstRound(false)
           setWordQueue(orangeWords)
           const firstOrangeIndex = words.findIndex(w => w.id === orangeWords[0])
           setCurrentWordIndex(firstOrangeIndex)
@@ -354,12 +358,20 @@ export default function Practice() {
     // Check if all words are green in first round of phase 3
     const allGreen = words.every(word => wordStatuses[word.id] === 'green')
 
+    // Log each word's status individually
+    const wordStatusList = words.map(word => ({
+      word: word.base_form,
+      id: word.id,
+      status: wordStatuses[word.id]
+    }))
+
     console.log('🔍 Checking for perfect score:', {
       allGreen,
       isFirstRound,
       phase: session?.current_phase,
       rewardSettingsLoaded: !!rewardSettings,
-      wordStatuses
+      wordCount: words.length,
+      wordStatusList
     })
 
     if (allGreen && isFirstRound && session?.current_phase === 3) {

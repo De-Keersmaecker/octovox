@@ -295,7 +295,11 @@ export default function Practice() {
         if (orangeWords.length === 0) {
           // All green in first round! Check for perfect score in phase 3
           if (session?.current_phase === 3) {
-            checkForPerfectScore()
+            const isPerfectScore = checkForPerfectScore()
+            // If not perfect score (modal not shown), proceed normally
+            if (!isPerfectScore) {
+              checkPhaseProgression()
+            }
           } else {
             checkPhaseProgression()
           }
@@ -336,17 +340,26 @@ export default function Practice() {
     // Check if all words are green in first round of phase 3
     const allGreen = words.every(word => wordStatuses[word.id] === 'green')
 
+    console.log('Checking for perfect score:', {
+      allGreen,
+      isFirstRound,
+      phase: session?.current_phase,
+      wordStatuses
+    })
+
     if (allGreen && isFirstRound && session?.current_phase === 3) {
       console.log('🎉 Perfect score detected! All words correct in first try!')
+
+      // Show the reward modal
       setShowPerfectScoreReward(true)
 
       // Don't proceed to next battery/phase automatically
-      // Let the user enjoy the reward and click continue
-      return
+      // The modal's "VERDER GAAN" button will call checkPhaseProgression()
+      return true
     }
 
     // If not perfect score, proceed normally
-    checkPhaseProgression()
+    return false
   }
 
   const checkPhaseProgression = async () => {
@@ -762,7 +775,7 @@ export default function Practice() {
                 <iframe
                   width="480"
                   height="270"
-                  src={rewardSettings.perfect_score_video_url}
+                  src={`${rewardSettings.perfect_score_video_url}${rewardSettings.perfect_score_video_url.includes('?') ? '&' : '?'}autoplay=1&mute=0`}
                   title="Beloning video"
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

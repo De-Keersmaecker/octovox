@@ -16,7 +16,8 @@ Als aan alle voorwaarden voldaan is:
 - 🎉 Beloningsscherm verschijnt
 - 📹 Video speelt automatisch af (als geconfigureerd)
 - 💬 Aangepast bericht wordt getoond
-- ✅ Student kan doorgaan of terug naar dashboard
+- ✅ Student kan sessie afronden of terug naar dashboard
+- 🏆 Sessie wordt automatisch gemarkeerd als voltooid bij afronden
 
 ---
 
@@ -147,8 +148,8 @@ ON CONFLICT (setting_key) DO NOTHING;
    - Toont custom message
    - Speelt video af (autoplay + unmuted)
    - Biedt knoppen aan:
-     - "VERDER GAAN" → Gaat door naar volgende battery/fase
-     - "TERUG NAAR DASHBOARD" → Stopt de oefensessie
+     - "AFRONDEN" → Markeert sessie als voltooid en keert terug naar dashboard
+     - "TERUG NAAR DASHBOARD" → Keert direct terug naar dashboard
 
 ---
 

@@ -1398,6 +1398,37 @@ app.post('/api/learning/battery/complete', authenticateToken, requireRole('stude
   }
 });
 
+// Mark session as complete (for perfect score)
+app.post('/api/learning/session/:sessionId/complete', authenticateToken, requireRole('student'), async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { sessionId } = req.params;
+
+    // Verify session belongs to user
+    const session = await db.query(
+      'SELECT * FROM learning_sessions WHERE id = $1 AND user_id = $2',
+      [sessionId, userId]
+    );
+
+    if (session.rows.length === 0) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    // Mark session as complete
+    await db.query(
+      `UPDATE learning_sessions
+       SET session_state = 'completed', completed_at = NOW(), updated_at = NOW()
+       WHERE id = $1`,
+      [sessionId]
+    );
+
+    res.json({ success: true, message: 'Session completed' });
+  } catch (error) {
+    console.error('Complete session error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Administrator login
 app.post('/api/auth/admin-login', async (req, res) => {
   try {

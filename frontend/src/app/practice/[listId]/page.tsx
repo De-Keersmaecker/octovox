@@ -813,15 +813,28 @@ export default function Practice() {
             <div className="flex gap-4 justify-center">
               <button
                 onClick={async () => {
-                  console.log('User clicked VERDER GAAN after perfect score')
+                  console.log('User clicked AFRONDEN after perfect score')
                   setShowPerfectScoreReward(false)
 
-                  // Complete the current battery/phase
-                  await checkPhaseProgression()
+                  // Mark session as complete and return to dashboard
+                  try {
+                    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/session/${session?.id}/complete`, {
+                      method: 'POST',
+                      headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                      }
+                    })
+                  } catch (error) {
+                    console.error('Failed to mark session as complete:', error)
+                  }
+
+                  // Show completion and redirect
+                  router.push('/dashboard')
                 }}
                 className="retro-button bg-green-600 hover:bg-green-700 text-xl px-8 py-4"
               >
-                VERDER GAAN
+                AFRONDEN
               </button>
               <button
                 onClick={() => router.push('/dashboard')}

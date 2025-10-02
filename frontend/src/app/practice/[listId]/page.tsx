@@ -75,10 +75,13 @@ export default function Practice() {
       })
       if (response.ok) {
         const settings = await response.json()
+        console.log('✅ Reward settings loaded:', settings)
         setRewardSettings(settings)
+      } else {
+        console.error('❌ Failed to load reward settings, status:', response.status)
       }
     } catch (error) {
-      console.error('Failed to fetch reward settings:', error)
+      console.error('❌ Failed to fetch reward settings:', error)
     }
   }
 
@@ -351,24 +354,28 @@ export default function Practice() {
     // Check if all words are green in first round of phase 3
     const allGreen = words.every(word => wordStatuses[word.id] === 'green')
 
-    console.log('Checking for perfect score:', {
+    console.log('🔍 Checking for perfect score:', {
       allGreen,
       isFirstRound,
       phase: session?.current_phase,
+      rewardSettingsLoaded: !!rewardSettings,
       wordStatuses
     })
 
     if (allGreen && isFirstRound && session?.current_phase === 3) {
-      console.log('🎉 Perfect score detected! All words correct in first try!')
+      console.log('🎉 PERFECT SCORE DETECTED! All words correct in first try!')
+      console.log('📊 Reward settings:', rewardSettings)
 
       // Show the reward modal
       setShowPerfectScoreReward(true)
+      console.log('✅ Modal state set to TRUE')
 
       // Don't proceed to next battery/phase automatically
-      // The modal's "VERDER GAAN" button will call checkPhaseProgression()
+      // The modal's "AFRONDEN" button will mark session complete
       return true
     }
 
+    console.log('❌ Not a perfect score, continuing normally')
     // If not perfect score, proceed normally
     return false
   }
@@ -786,6 +793,12 @@ export default function Practice() {
       </div>
 
       {/* Perfect Score Reward Modal */}
+      {(() => {
+        if (showPerfectScoreReward) {
+          console.log('🖼️ Modal render check:', { showPerfectScoreReward, rewardSettings: !!rewardSettings })
+        }
+        return null
+      })()}
       {showPerfectScoreReward && rewardSettings && (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
           <div className="retro-border p-8 bg-black max-w-2xl w-full mx-4 text-center">

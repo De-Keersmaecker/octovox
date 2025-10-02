@@ -176,6 +176,49 @@ app.post('/api/admin/init-database', async (req, res) => {
   }
 });
 
+// Schema fix migration endpoint (SECURED with admin authentication)
+app.post('/api/admin/migrate-schema-fixes', authenticateToken, requireRole('administrator'), async (req, res) => {
+  try {
+    console.log('Starting schema fix migration...');
+    const fs = require('fs');
+    const path = require('path');
+
+    // Read the migration SQL file
+    const migrationPath = path.join(__dirname, '../database/fix-schema-conflicts.sql');
+    const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+
+    console.log('Migration file loaded, executing SQL...');
+
+    // Execute the migration
+    await db.query(migrationSQL);
+
+    console.log('Schema fix migration completed successfully');
+
+    res.json({
+      success: true,
+      message: 'Schema fix migration completed successfully',
+      details: {
+        fixed: [
+          'UUID vs INTEGER type conflicts',
+          'Added missing tables (practice_attempts, practice_sessions, etc.)',
+          'Added theme column to word_lists',
+          'Added class_code column to users',
+          'Updated users role constraint for administrator'
+        ]
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Schema fix migration error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Schema fix migration failed',
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // 3-Phase system migration endpoint
 app.post('/api/admin/migrate-3-phase', async (req, res) => {
   try {

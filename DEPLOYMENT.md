@@ -12,7 +12,24 @@
 
 De nieuwe schema fixes moeten toegepast worden op de production database.
 
-### Optie 1: Via Railway CLI (Aanbevolen)
+### Optie 1: Via Admin Dashboard UI (MAKKELIJKST!) 🎉
+
+1. Ga naar https://octovox-frontend-production.up.railway.app/admin
+2. Login als administrator
+3. Klik op **"DATABASE MIGRATIONS"** (gele knop)
+4. Lees de informatie over wat er gefixt wordt
+5. Klik op **"VOER MIGRATION UIT"**
+6. Bevestig de actie
+7. Wacht tot de migration compleet is
+8. Je ziet een success bericht met alle uitgevoerde fixes
+
+**Voordeel:**
+- ✅ Geen CLI of database tools nodig
+- ✅ Direct feedback over success/failure
+- ✅ Veilig - vereist administrator authenticatie
+- ✅ Kan meerdere keren uitgevoerd worden (idempotent)
+
+### Optie 2: Via Railway CLI
 
 ```bash
 # Login bij Railway
@@ -25,7 +42,7 @@ railway link
 railway run psql $DATABASE_URL < database/fix-schema-conflicts.sql
 ```
 
-### Optie 2: Via Railway Dashboard
+### Optie 3: Via Railway Dashboard
 
 1. Ga naar [Railway Dashboard](https://railway.app/)
 2. Open je Octovox project
@@ -34,7 +51,7 @@ railway run psql $DATABASE_URL < database/fix-schema-conflicts.sql
 5. Kopieer de inhoud van `database/fix-schema-conflicts.sql`
 6. Plak en voer uit in de Railway SQL console
 
-### Optie 3: Via lokale psql (als je DATABASE_URL hebt)
+### Optie 4: Via lokale psql (als je DATABASE_URL hebt)
 
 ```bash
 # Haal DATABASE_URL op van Railway dashboard

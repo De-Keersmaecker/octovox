@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, Upload, Edit, Trash2, BookOpen } from 'lucide-react'
+import { Plus, Upload, Edit, Trash2, BookOpen, Database } from 'lucide-react'
 
 interface WordList {
   id: string
@@ -117,7 +117,7 @@ export default function AdminDashboard() {
           {/* Actions */}
           <div className="retro-border p-6">
             <h2 className="text-2xl font-bold mb-4">Acties</h2>
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <button
                 onClick={() => router.push('/admin/upload')}
                 className="retro-button flex items-center gap-2"
@@ -131,6 +131,19 @@ export default function AdminDashboard() {
               >
                 <Plus size={16} />
                 NIEUWE LIJST
+              </button>
+              <button
+                onClick={() => router.push('/admin/migrations')}
+                className="retro-button flex items-center gap-2 bg-yellow-600 hover:bg-yellow-700 border-yellow-600"
+              >
+                <Database size={16} />
+                DATABASE MIGRATIONS
+              </button>
+              <button
+                onClick={() => router.push('/admin/reward-settings')}
+                className="retro-button-secondary flex items-center gap-2"
+              >
+                REWARD INSTELLINGEN
               </button>
             </div>
           </div>

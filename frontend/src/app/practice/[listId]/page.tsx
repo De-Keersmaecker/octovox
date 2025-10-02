@@ -117,6 +117,8 @@ export default function Practice() {
   }, [session?.current_phase, currentWordIndex, showFeedback])
 
   const initializeSession = async () => {
+    console.log('🔄 initializeSession() called')
+    console.trace('Call stack:')
     try {
       console.log('Initializing session for listId:', listId)
 
@@ -312,6 +314,7 @@ export default function Practice() {
             const isPerfectScore = checkForPerfectScore()
             if (isPerfectScore) {
               // Perfect score! Modal will be shown, don't continue
+              console.log('⭐ Perfect score detected, STOPPING moveToNextWord flow')
               setIsFirstRound(false)  // Still need to mark round as complete
               return  // Stop here, modal will handle next steps
             }
@@ -399,6 +402,7 @@ export default function Practice() {
   }
 
   const checkPhaseProgression = async () => {
+    console.log('⏭️ checkPhaseProgression() called')
     if (!session) return
 
     try {
@@ -427,6 +431,7 @@ export default function Practice() {
   }
 
   const completeBattery = async () => {
+    console.log('🏁 completeBattery() called')
     try {
       console.log('Completing battery:', {
         sessionId: session?.id,

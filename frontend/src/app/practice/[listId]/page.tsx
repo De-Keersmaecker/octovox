@@ -115,6 +115,8 @@ export default function Practice() {
 
   const initializeSession = async () => {
     try {
+      console.log('Initializing session for listId:', listId)
+
       const sessionResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/session/${listId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`
@@ -126,6 +128,7 @@ export default function Practice() {
       }
 
       const sessionData = await sessionResponse.json()
+      console.log('Session data:', sessionData.session)
       setSession(sessionData.session)
 
       const batteryResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/battery/${sessionData.session.id}`, {
@@ -139,6 +142,12 @@ export default function Practice() {
       }
 
       const batteryData = await batteryResponse.json()
+      console.log('Battery data:', {
+        battery: batteryData.battery,
+        wordsCount: batteryData.words.length,
+        words: batteryData.words.map((w: Word) => w.base_form)
+      })
+
       setBattery(batteryData.battery)
       setWords(batteryData.words)
 
@@ -154,6 +163,8 @@ export default function Practice() {
       setRoundWordIndex(0)
       setCurrentWordIndex(0)
       setWordQueue([])
+
+      console.log('Session initialized, starting fresh with', batteryData.words.length, 'words')
 
       setLoading(false)
     } catch (error) {
@@ -392,7 +403,14 @@ export default function Practice() {
 
   const completeBattery = async () => {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/battery/complete`, {
+      console.log('Completing battery:', {
+        sessionId: session?.id,
+        batteryId: battery?.id,
+        phase: session?.current_phase,
+        batteryNumber: battery?.battery_number
+      })
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/learning/battery/complete`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -404,8 +422,15 @@ export default function Practice() {
         })
       })
 
+      if (!response.ok) {
+        throw new Error('Failed to complete battery')
+      }
+
+      const result = await response.json()
+      console.log('Battery completion result:', result)
+
       // Load next battery or complete phase
-      initializeSession()
+      await initializeSession()
     } catch (error) {
       console.error('Failed to complete battery:', error)
     }
@@ -787,9 +812,12 @@ export default function Practice() {
 
             <div className="flex gap-4 justify-center">
               <button
-                onClick={() => {
+                onClick={async () => {
+                  console.log('User clicked VERDER GAAN after perfect score')
                   setShowPerfectScoreReward(false)
-                  checkPhaseProgression()
+
+                  // Complete the current battery/phase
+                  await checkPhaseProgression()
                 }}
                 className="retro-button bg-green-600 hover:bg-green-700 text-xl px-8 py-4"
               >

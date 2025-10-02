@@ -371,7 +371,13 @@ export default function Practice() {
       phase: session?.current_phase,
       rewardSettingsLoaded: !!rewardSettings,
       wordCount: words.length,
-      wordStatusList
+      wordStatusList,
+      conditionsMet: {
+        allGreen: allGreen,
+        isFirstRound: isFirstRound,
+        isPhase3: session?.current_phase === 3,
+        willShowModal: allGreen && isFirstRound && session?.current_phase === 3
+      }
     })
 
     if (allGreen && isFirstRound && session?.current_phase === 3) {

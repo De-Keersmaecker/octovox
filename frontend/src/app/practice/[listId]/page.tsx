@@ -93,7 +93,7 @@ export default function Practice() {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
+        timeoutRef.current = undefined
       }
     }
   }, [])
@@ -102,7 +102,7 @@ export default function Practice() {
   useEffect(() => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
+      timeoutRef.current = undefined
     }
   }, [currentWordIndex])
 

@@ -43,6 +43,7 @@ export default function Practice() {
   const [battery, setBattery] = useState<Battery | null>(null)
   const [words, setWords] = useState<Word[]>([])
   const [currentWordIndex, setCurrentWordIndex] = useState(0)
+  const [showExitConfirmation, setShowExitConfirmation] = useState(false)
   const [wordStatuses, setWordStatuses] = useState<{[key: string]: 'white' | 'green' | 'orange' | 'red'}>({})
   const [showFeedback, setShowFeedback] = useState(false)
   const [isCorrect, setIsCorrect] = useState(false)
@@ -87,13 +88,23 @@ export default function Practice() {
     }
   }, [currentWordIndex, words])
 
+  // Cleanup timeouts on unmount and when moving between words
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
       }
     }
   }, [])
+
+  // Clear timeout when word changes to prevent race conditions
+  useEffect(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [currentWordIndex])
 
   useEffect(() => {
     // Auto-focus typing input in Phase 3
@@ -237,6 +248,11 @@ export default function Practice() {
 
     playFeedbackSound(correct)
     await submitAttempt(currentWord.id, correct, answer)
+
+    // Clear any existing timeout before setting new one
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
 
     // After 3 seconds, move to next word
     timeoutRef.current = setTimeout(() => {
@@ -484,16 +500,6 @@ export default function Practice() {
       if (targetChar && typedChar !== targetChar) {
         correctedValue += targetChar
         hadAutocorrection = true
-
-        // Play negative sound for each autocorrected letter
-        playAutocorrectSound()
-
-        // Set evaluation to red immediately when autocorrect happens
-        setAutocorrectApplied(true)
-        setWordStatuses(prev => ({
-          ...prev,
-          [currentWord.id]: 'red'
-        }))
       } else {
         correctedValue += typedChar
       }
@@ -501,6 +507,16 @@ export default function Practice() {
 
     setOriginalTypedAnswer(input)
     setTypedAnswer(correctedValue)
+
+    // Only update state ONCE after loop, and only play sound once if there was autocorrection
+    if (hadAutocorrection && !autocorrectApplied) {
+      playAutocorrectSound()
+      setAutocorrectApplied(true)
+      setWordStatuses(prev => ({
+        ...prev,
+        [currentWord.id]: 'red'
+      }))
+    }
 
     // Check if word is complete
     if (correctedValue.length === targetWord.length && correctedValue.toLowerCase() === targetWord.toLowerCase()) {
@@ -603,7 +619,7 @@ export default function Practice() {
               HERVAT
             </button>
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => setShowExitConfirmation(true)}
               className="retro-button-secondary"
             >
               DASHBOARD
@@ -621,7 +637,7 @@ export default function Practice() {
         <header className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => setShowExitConfirmation(true)}
               className="retro-button flex items-center gap-2"
             >
               <ArrowLeft size={16} />
@@ -771,6 +787,32 @@ export default function Practice() {
                 className="retro-button-secondary text-xl px-8 py-4"
               >
                 TERUG NAAR DASHBOARD
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Exit Confirmation Dialog */}
+      {showExitConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="retro-border bg-black p-8 max-w-md w-full">
+            <h2 className="text-2xl font-bold mb-4">SESSIE VERLATEN?</h2>
+            <p className="mb-6 opacity-90">
+              Je voortgang in deze oefensessie gaat verloren als je nu weggaat. Weet je zeker dat je wilt stoppen?
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowExitConfirmation(false)}
+                className="retro-button flex-1"
+              >
+                DOORGAAN MET OEFENEN
+              </button>
+              <button
+                onClick={() => router.push('/dashboard')}
+                className="retro-button-secondary flex-1"
+              >
+                JA, VERLATEN
               </button>
             </div>
           </div>

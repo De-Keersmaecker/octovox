@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 import { auth } from '@/lib/api'
 import Link from 'next/link'
 
@@ -12,6 +13,7 @@ export default function Register() {
   const [classCode, setClassCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -67,16 +69,26 @@ export default function Register() {
             </div>
 
             <div>
-              <label className="block text-sm font-bold mb-2">PASSWORD</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="retro-input w-full p-3"
-                placeholder="Minimum 6 characters"
-                minLength={6}
-                required
-              />
+              <label className="block text-sm font-bold mb-2">WACHTWOORD</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="retro-input w-full p-3 pr-12"
+                  placeholder="Minimum 6 tekens"
+                  minLength={6}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-75"
+                  aria-label={showPassword ? "Verberg wachtwoord" : "Toon wachtwoord"}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
 
             <div>

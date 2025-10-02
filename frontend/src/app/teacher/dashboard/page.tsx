@@ -21,9 +21,15 @@ interface ClassStats {
   total_words_practiced: number
 }
 
+interface Class {
+  code: string
+  name: string
+}
+
 export default function TeacherDashboard() {
   const [students, setStudents] = useState<Student[]>([])
   const [classStats, setClassStats] = useState<ClassStats | null>(null)
+  const [classes, setClasses] = useState<Class[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedClass, setSelectedClass] = useState<string>('all')
   const router = useRouter()
@@ -41,46 +47,39 @@ export default function TeacherDashboard() {
       return
     }
 
-    // Mock data for development
-    setStudents([
-      {
-        id: '1',
-        name: 'Anna Janssens',
-        email: 'anna@example.com',
-        class_code: 'CLASS2024',
-        total_words_practiced: 150,
-        average_accuracy: 85,
-        last_active: '2024-01-20'
-      },
-      {
-        id: '2',
-        name: 'Pieter De Vries',
-        email: 'pieter@example.com',
-        class_code: 'CLASS2024',
-        total_words_practiced: 200,
-        average_accuracy: 92,
-        last_active: '2024-01-21'
-      },
-      {
-        id: '3',
-        name: 'Emma Peeters',
-        email: 'emma@example.com',
-        class_code: 'CLASS2025',
-        total_words_practiced: 120,
-        average_accuracy: 78,
-        last_active: '2024-01-19'
+    fetchDashboardData()
+  }, [router, selectedClass])
+
+  const fetchDashboardData = async () => {
+    setLoading(true)
+    try {
+      const token = localStorage.getItem('token')
+      const queryParam = selectedClass !== 'all' ? `?classCode=${selectedClass}` : ''
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/teacher/dashboard${queryParam}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard data')
       }
-    ])
 
-    setClassStats({
-      total_students: 3,
-      active_today: 2,
-      average_accuracy: 85,
-      total_words_practiced: 470
-    })
-
-    setLoading(false)
-  }, [router])
+      const data = await response.json()
+      setStudents(data.students || [])
+      setClassStats(data.stats || null)
+      if (data.classes) {
+        setClasses(data.classes)
+      }
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
+      // Keep empty state on error
+      setStudents([])
+      setClassStats(null)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -100,10 +99,11 @@ export default function TeacherDashboard() {
     )
   }
 
-  const classes = ['all', 'CLASS2024', 'CLASS2025']
   const filteredStudents = selectedClass === 'all'
     ? students
     : students.filter(s => s.class_code === selectedClass)
+
+  const classOptions = ['all', ...classes.map(c => c.code)]
 
   return (
     <div className="min-h-screen p-4">
@@ -124,7 +124,7 @@ export default function TeacherDashboard() {
 
         {/* Statistics Overview */}
         {classStats && (
-          <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="retro-border p-6 text-center">
               <Users size={32} className="mx-auto mb-2" />
               <div className="text-2xl font-bold">{classStats.total_students}</div>
@@ -150,10 +150,10 @@ export default function TeacherDashboard() {
 
         {/* Class Filter */}
         <div className="retro-border p-4 mb-6">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <span className="font-mono font-bold">FILTER KLAS:</span>
-            <div className="flex gap-2">
-              {classes.map(cls => (
+            <div className="flex flex-wrap gap-2">
+              {classOptions.map(cls => (
                 <button
                   key={cls}
                   onClick={() => setSelectedClass(cls)}
@@ -229,7 +229,7 @@ export default function TeacherDashboard() {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-3 gap-4">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => router.push('/teacher/difficulty')}
             className="retro-border p-6 hover:bg-white hover:text-black transition-colors"

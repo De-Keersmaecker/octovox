@@ -242,7 +242,7 @@ export default function ClassManagement() {
             {/* Class Info */}
             <div className="retro-border p-6 mb-6">
               <h2 className="text-2xl font-bold mb-4">{selectedClassData.name}</h2>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center">
                   <Users size={32} className="mx-auto mb-2" />
                   <div className="text-2xl font-bold">{selectedClassData.student_count}</div>

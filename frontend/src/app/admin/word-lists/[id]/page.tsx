@@ -335,7 +335,7 @@ export default function WordListManagement() {
         {/* Statistics */}
         {wordList && (
           <div className="retro-border p-6 mb-6">
-            <div className="grid grid-cols-4 gap-4 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
               <div>
                 <div className="text-2xl font-bold">{wordList.total_words}</div>
                 <div className="text-sm opacity-75">Totaal woorden</div>

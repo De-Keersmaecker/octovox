@@ -212,7 +212,7 @@ export default function WordDifficultyOverview() {
 
         {/* Statistics Overview */}
         {stats && (
-          <div className="grid grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="retro-border p-6 text-center">
               <TrendingDown size={32} className="mx-auto mb-2 text-red-500" />
               <div className="text-2xl font-bold">{stats.mostDifficult.length}</div>
@@ -308,7 +308,7 @@ export default function WordDifficultyOverview() {
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 grid grid-cols-3 gap-4">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4">
           <button
             onClick={() => router.push('/teacher/reports')}
             className="retro-border p-6 hover:bg-white hover:text-black transition-colors"

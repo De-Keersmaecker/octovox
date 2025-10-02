@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 import { auth } from '@/lib/api'
 import Link from 'next/link'
 
@@ -12,6 +13,8 @@ export default function Login() {
   const [teacherCode, setTeacherCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showTeacherCode, setShowTeacherCode] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,8 +36,10 @@ export default function Login() {
 
       if (user.role === 'student') {
         router.push('/dashboard')
-      } else {
-        router.push('/admin')
+      } else if (user.role === 'teacher') {
+        router.push('/teacher/dashboard')
+      } else if (user.role === 'administrator') {
+        router.push('/admin/dashboard')
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Login failed')
@@ -88,24 +93,44 @@ export default function Login() {
             {isStudent ? (
               <div>
                 <label className="block text-sm font-bold mb-2">WACHTWOORD</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="retro-input w-full p-3"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="retro-input w-full p-3 pr-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-75"
+                    aria-label={showPassword ? "Verberg wachtwoord" : "Toon wachtwoord"}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
             ) : (
               <div>
                 <label className="block text-sm font-bold mb-2">LERAAR CODE</label>
-                <input
-                  type="password"
-                  value={teacherCode}
-                  onChange={(e) => setTeacherCode(e.target.value)}
-                  className="retro-input w-full p-3"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showTeacherCode ? "text" : "password"}
+                    value={teacherCode}
+                    onChange={(e) => setTeacherCode(e.target.value)}
+                    className="retro-input w-full p-3 pr-12"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowTeacherCode(!showTeacherCode)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 hover:opacity-75"
+                    aria-label={showTeacherCode ? "Verberg code" : "Toon code"}
+                  >
+                    {showTeacherCode ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
               </div>
             )}
 

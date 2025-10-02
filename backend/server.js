@@ -632,8 +632,8 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ error: 'User already exists' });
     }
 
-    // Check if class exists
-    const classResult = await db.query('SELECT id FROM classes WHERE class_code = $1', [classCode]);
+    // Check if class exists (using 'code' column, not 'class_code')
+    const classResult = await db.query('SELECT id, code FROM classes WHERE code = $1', [classCode]);
     if (classResult.rows.length === 0) {
       return res.status(400).json({ error: 'Invalid class code' });
     }
@@ -642,11 +642,11 @@ app.post('/api/auth/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 12);
     const verificationToken = uuidv4();
 
-    // Create user
+    // Create user with class_code set
     const userResult = await db.query(
-      `INSERT INTO users (email, name, password_hash, role, verification_token, is_verified)
-       VALUES ($1, $2, $3, 'student', $4, TRUE) RETURNING id, email, name, role`,
-      [email, name, hashedPassword, verificationToken]
+      `INSERT INTO users (email, name, password_hash, role, verification_token, is_verified, class_code)
+       VALUES ($1, $2, $3, 'student', $4, TRUE, $5) RETURNING id, email, name, role, class_code`,
+      [email, name, hashedPassword, verificationToken, classCode]
     );
 
     const user = userResult.rows[0];
@@ -733,8 +733,8 @@ app.post('/api/auth/teacher-login', async (req, res) => {
     }
 
     const userResult = await db.query(
-      'SELECT id, email, name, role FROM users WHERE email = $1 AND role IN ($2, $3)',
-      [email, 'teacher', 'administrator']
+      `SELECT id, email, name, role FROM users WHERE email = $1 AND role IN ('teacher', 'administrator')`,
+      [email]
     );
 
     if (userResult.rows.length === 0) {
@@ -1455,6 +1455,83 @@ app.put('/api/admin/reward-settings', authenticateToken, requireAdmin, async (re
 });
 
 // Teacher routes
+
+// Get teacher dashboard statistics and student list
+app.get('/api/teacher/dashboard', authenticateToken, requireRole('teacher'), async (req, res) => {
+  try {
+    const { classCode } = req.query;
+
+    // Base query for students - filter by classCode if provided
+    let studentQuery = `
+      SELECT
+        u.id,
+        u.name,
+        u.email,
+        u.class_code,
+        COUNT(DISTINCT ls.id) as sessions_count,
+        COALESCE(SUM(ls.words_practiced), 0) as total_words_practiced,
+        COALESCE(AVG(CASE WHEN ls.words_practiced > 0 THEN (ls.words_correct::DECIMAL / ls.words_practiced::DECIMAL * 100) ELSE 0 END), 0) as average_accuracy,
+        MAX(ls.completed_at) as last_active
+      FROM users u
+      LEFT JOIN learning_sessions ls ON u.id = ls.user_id AND ls.completed_at IS NOT NULL
+      WHERE u.role = 'student'
+    `;
+
+    const queryParams = [];
+    if (classCode && classCode !== 'all') {
+      queryParams.push(classCode);
+      studentQuery += ` AND u.class_code = $1`;
+    }
+
+    studentQuery += `
+      GROUP BY u.id, u.name, u.email, u.class_code
+      ORDER BY u.name
+    `;
+
+    const studentsResult = await db.query(studentQuery, queryParams);
+
+    // Calculate overall statistics
+    const students = studentsResult.rows.map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email,
+      class_code: row.class_code,
+      total_words_practiced: parseInt(row.total_words_practiced) || 0,
+      average_accuracy: parseFloat(row.average_accuracy).toFixed(1),
+      last_active: row.last_active || null
+    }));
+
+    const stats = {
+      total_students: students.length,
+      active_today: students.filter(s => {
+        if (!s.last_active) return false;
+        const lastActive = new Date(s.last_active);
+        const today = new Date();
+        return lastActive.toDateString() === today.toDateString();
+      }).length,
+      average_accuracy: students.length > 0
+        ? (students.reduce((sum, s) => sum + parseFloat(s.average_accuracy), 0) / students.length).toFixed(1)
+        : 0,
+      total_words_practiced: students.reduce((sum, s) => sum + s.total_words_practiced, 0)
+    };
+
+    // Get list of available classes for filtering
+    const classesResult = await db.query(`
+      SELECT DISTINCT code, name
+      FROM classes
+      ORDER BY code
+    `);
+
+    res.json({
+      students,
+      stats,
+      classes: classesResult.rows
+    });
+  } catch (error) {
+    console.error('Get teacher dashboard error:', error);
+    res.status(500).json({ error: 'Internal server error', details: error.message });
+  }
+});
 
 // Get classes and their assigned word lists
 app.get('/api/teacher/classes', authenticateToken, requireRole('teacher'), async (req, res) => {
